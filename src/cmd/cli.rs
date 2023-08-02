@@ -16,6 +16,10 @@ pub struct Cli {
     #[clap(short, long, default_value_t = ConnectionMethod::Tcp)]
     /// Connection Method
     method: ConnectionMethod,
+
+    #[clap(short, long)]
+    /// Connection Method
+    src_addr: Option<String>,
 }
 
 #[derive(ValueEnum, Clone, Debug, Default)]
