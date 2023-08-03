@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, ValueEnum};
 
 #[derive(Debug, Parser)] // requires `derive` feature
 #[command(name = "nk")]
@@ -8,22 +8,26 @@ use clap::{Parser, Subcommand, ValueEnum};
 #[command(about = "Net Kraken, network connectivity tester.", long_about = None)]
 pub struct Cli {
     /// Destination hostname or IP address
-    destination: String,
+    pub dst_host: String,
 
     /// Destination port
-    port: u16,
+    pub dst_port: u16,
 
     #[clap(short, long, default_value_t = ConnectionMethod::Tcp)]
     /// Connection Method
-    method: ConnectionMethod,
+    pub method: ConnectionMethod,
 
-    #[clap(short, long)]
-    /// Connection Method
-    src_addr: Option<String>,
+    #[clap(long, default_value = "0.0.0.0")]
+    /// Source IP Address
+    pub src_addr: String,
+
+    #[clap(long, default_value_t = 0)]
+    /// Source port
+    pub src_port: u16,
 }
 
 #[derive(ValueEnum, Clone, Debug, Default)]
-enum ConnectionMethod {
+pub enum ConnectionMethod {
     #[default]
     Tcp,
     Udp,
