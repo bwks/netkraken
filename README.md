@@ -1,9 +1,10 @@
-# Kraken
+# Net Kraken
 
-Network connectivity tester.
+Net Kraken is a Network connectivity tester inspired by `netcat` 
+and written in Rust.
 
 Goals:
  - Cross platform, with Windows as a first class citizen
  - Async
 
-Work on progress
+Work in progress
