@@ -1,5 +1,6 @@
 mod cmd;
 mod tcp;
+mod udp;
 mod util;
 
 use crate::cmd::cli::init_cli;
