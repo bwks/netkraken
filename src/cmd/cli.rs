@@ -19,17 +19,21 @@ pub struct Cli {
     /// Destination port
     pub dst_port: u16,
 
-    #[clap(short, long, default_value_t = ConnectionMethod::Tcp)]
     /// Connection Method
+    #[clap(short, long, default_value_t = ConnectionMethod::Tcp)]
     pub method: ConnectionMethod,
 
-    #[clap(long, default_value = "0.0.0.0")]
     /// Source IP Address
+    #[clap(long, default_value = "0.0.0.0")]
     pub src_addr: String,
 
+    /// Source port (0 detects random unused high port between 1024-65534)
     #[clap(long, default_value_t = 0)]
-    /// Source port
     pub src_port: u16,
+
+    /// Listen as a server
+    #[clap(short, long, default_value_t = false)]
+    pub listen: bool,
 }
 
 #[derive(ValueEnum, Clone, Debug, Default)]
