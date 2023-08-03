@@ -7,6 +7,7 @@ use clap::{Parser, ValueEnum};
 use tokio::net::{TcpSocket, UdpSocket};
 
 use crate::util::parser::parse_ipaddr;
+use crate::util::text::get_conn_string;
 
 #[derive(Debug, Parser)] // requires `derive` feature
 #[command(name = "nk")]
@@ -78,7 +79,12 @@ pub async fn init_cli() -> Result<()> {
 
             match socket.connect(connect_addr).await {
                 Ok(s) => {
-                    println!("connected to {} using {}", s.peer_addr()?, cli.method);
+                    let conn_string = get_conn_string(
+                        cli.method.to_string().to_uppercase(),
+                        s.local_addr()?.to_string(),
+                        s.peer_addr()?.to_string(),
+                    );
+                    print!("{conn_string}")
                 }
                 Err(e) => match e.kind() {
                     io::ErrorKind::ConnectionRefused => println!("connection refused"),
@@ -89,11 +95,16 @@ pub async fn init_cli() -> Result<()> {
         }
         ConnectionMethod::Udp => {
             let dst_ip_port_str = format!("{}:{}", dst_addr, cli.dst_port);
-            let conn_string = format!("connection from: {}\n", bind_addr);
 
             let socket = UdpSocket::bind(bind_addr).await?;
             socket.connect(dst_ip_port_str).await?;
+            let conn_string = get_conn_string(
+                cli.method.to_string().to_uppercase(),
+                socket.local_addr()?.to_string(),
+                socket.peer_addr()?.to_string(),
+            );
             socket.send(conn_string.as_bytes()).await?;
+            print!("{conn_string}")
         }
     }
     Ok(())
