@@ -67,8 +67,8 @@ pub async fn init_cli() -> Result<()> {
         ConnectionMethod::Tcp => {
             if cli.listen {
                 let tcp_server = TcpServer {
-                    src_addr: cli.dst_host,
-                    src_port: cli.dst_port,
+                    listen_addr: cli.dst_host,
+                    listen_port: cli.dst_port,
                 };
                 tcp_server.listen().await?;
             } else {
@@ -84,8 +84,8 @@ pub async fn init_cli() -> Result<()> {
         ConnectionMethod::Udp => {
             if cli.listen {
                 let udp_server = UdpServer {
-                    src_addr: cli.dst_host,
-                    src_port: cli.dst_port,
+                    listen_addr: cli.dst_host,
+                    listen_port: cli.dst_port,
                 };
                 udp_server.listen().await?;
             } else {

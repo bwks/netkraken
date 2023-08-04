@@ -5,15 +5,15 @@ use crate::konst::{BIND_ADDR, BIND_PORT};
 use crate::util::parser::parse_ipaddr;
 
 pub struct UdpServer {
-    pub src_addr: String,
-    pub src_port: u16,
+    pub listen_addr: String,
+    pub listen_port: u16,
 }
 
 impl UdpServer {
     pub async fn listen(&self) -> Result<()> {
-        let src_addr = parse_ipaddr(&self.src_addr)?;
+        let listen_addr = parse_ipaddr(&self.listen_addr)?;
 
-        let bind_addr = format!("{}:{}", src_addr, self.src_port);
+        let bind_addr = format!("{}:{}", listen_addr, self.listen_port);
 
         let sock = UdpSocket::bind(&bind_addr).await?;
         println!("UDP server listening on {}", &bind_addr);
@@ -33,8 +33,8 @@ impl UdpServer {
 impl Default for UdpServer {
     fn default() -> Self {
         Self {
-            src_addr: BIND_ADDR.to_owned(),
-            src_port: BIND_PORT,
+            listen_addr: BIND_ADDR.to_owned(),
+            listen_port: BIND_PORT,
         }
     }
 }
