@@ -6,6 +6,7 @@ use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use tokio::net::{TcpSocket, UdpSocket};
 
+use crate::udp::server::UdpServer;
 use crate::util::parser::parse_ipaddr;
 use crate::util::text::get_conn_string;
 
@@ -14,10 +15,12 @@ use crate::util::text::get_conn_string;
 #[command(bin_name = "nk")]
 #[command(about = "Net Kraken, network connectivity tester.", long_about = None)]
 pub struct Cli {
-    /// Destination hostname or IP address
+    /// Destination hostname or IP address ||
+    /// Listen address in `-l --listen` mode
     pub dst_host: String,
 
-    /// Destination port
+    /// Destination port ||
+    /// Listen port in `-l --listen` mode
     pub dst_port: u16,
 
     /// Connection Method
@@ -84,7 +87,7 @@ pub async fn init_cli() -> Result<()> {
                         s.local_addr()?.to_string(),
                         s.peer_addr()?.to_string(),
                     );
-                    print!("{conn_string}")
+                    println!("{conn_string}")
                 }
                 Err(e) => match e.kind() {
                     io::ErrorKind::ConnectionRefused => println!("connection refused"),
@@ -94,17 +97,25 @@ pub async fn init_cli() -> Result<()> {
             };
         }
         ConnectionMethod::Udp => {
-            let dst_ip_port_str = format!("{}:{}", dst_addr, cli.dst_port);
+            if cli.listen {
+                let udp_server = UdpServer {
+                    src_addr: cli.dst_host,
+                    src_port: cli.dst_port,
+                };
+                udp_server.listen().await?;
+            } else {
+                let dst_ip_port_str = format!("{}:{}", dst_addr, cli.dst_port);
 
-            let socket = UdpSocket::bind(bind_addr).await?;
-            socket.connect(dst_ip_port_str).await?;
-            let conn_string = get_conn_string(
-                cli.method.to_string().to_uppercase(),
-                socket.local_addr()?.to_string(),
-                socket.peer_addr()?.to_string(),
-            );
-            socket.send(conn_string.as_bytes()).await?;
-            print!("{conn_string}")
+                let socket = UdpSocket::bind(bind_addr).await?;
+                socket.connect(dst_ip_port_str).await?;
+                let conn_string = get_conn_string(
+                    cli.method.to_string().to_uppercase(),
+                    socket.local_addr()?.to_string(),
+                    socket.peer_addr()?.to_string(),
+                );
+                socket.send(conn_string.as_bytes()).await?;
+                println!("{conn_string}")
+            }
         }
     }
     Ok(())
