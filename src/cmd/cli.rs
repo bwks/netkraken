@@ -1,15 +1,12 @@
 use std::fmt::Display;
-use std::io;
-use std::net::SocketAddr;
 
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
-use tokio::net::{TcpSocket, UdpSocket};
 
+use crate::tcp::client::TcpClient;
+use crate::tcp::server::TcpServer;
 use crate::udp::client::UdpClient;
 use crate::udp::server::UdpServer;
-use crate::util::parser::parse_ipaddr;
-use crate::util::text::get_conn_string;
 
 #[derive(Debug, Parser)] // requires `derive` feature
 #[command(name = "nk")]
@@ -64,38 +61,25 @@ impl Display for ConnectionMethod {
 pub async fn init_cli() -> Result<()> {
     let cli = Cli::parse();
 
-    let src_addr = parse_ipaddr(&cli.src_addr)?;
-    let dst_addr = parse_ipaddr(&cli.dst_host)?;
-
-    let bind_addr = SocketAddr::new(src_addr, cli.src_port);
-    let connect_addr = SocketAddr::new(dst_addr, cli.dst_port);
-
     match cli.method {
         ConnectionMethod::Http => println!("http not implemented"),
         ConnectionMethod::Icmp => println!("icmp not implemented"),
         ConnectionMethod::Tcp => {
-            let socket = match src_addr.is_ipv4() {
-                true => TcpSocket::new_v4()?,
-                false => TcpSocket::new_v6()?,
-            };
-
-            socket.bind(bind_addr)?;
-
-            match socket.connect(connect_addr).await {
-                Ok(s) => {
-                    let conn_string = get_conn_string(
-                        cli.method.to_string().to_uppercase(),
-                        s.local_addr()?.to_string(),
-                        s.peer_addr()?.to_string(),
-                    );
-                    println!("{conn_string}")
-                }
-                Err(e) => match e.kind() {
-                    io::ErrorKind::ConnectionRefused => println!("connection refused"),
-                    io::ErrorKind::TimedOut => println!("connection timed out"),
-                    _ => println!("{:#?}", e),
-                },
-            };
+            if cli.listen {
+                let tcp_server = TcpServer {
+                    src_addr: cli.dst_host,
+                    src_port: cli.dst_port,
+                };
+                tcp_server.listen().await?;
+            } else {
+                let tcp_client = TcpClient::new(
+                    cli.dst_host,
+                    cli.dst_port,
+                    Some(cli.src_addr),
+                    Some(cli.src_port),
+                );
+                tcp_client.connect().await?;
+            }
         }
         ConnectionMethod::Udp => {
             if cli.listen {

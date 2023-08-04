@@ -4,6 +4,7 @@ use anyhow::Result;
 
 use tokio::net::UdpSocket;
 
+use crate::konst::{BIND_ADDR, BIND_PORT};
 use crate::util::parser::parse_ipaddr;
 use crate::util::text::get_conn_string;
 
@@ -23,11 +24,11 @@ impl UdpClient {
     ) -> UdpClient {
         let src_addr = match src_addr {
             Some(x) => x,
-            None => "0.0.0.0".to_owned(),
+            None => BIND_ADDR.to_owned(),
         };
         let src_port = match src_port {
             Some(x) => x,
-            None => 13337,
+            None => BIND_PORT,
         };
         UdpClient {
             dst_addr,
