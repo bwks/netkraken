@@ -8,7 +8,27 @@ use crate::tcp::server::TcpServer;
 use crate::udp::client::UdpClient;
 use crate::udp::server::UdpServer;
 
-#[derive(Debug, Parser)] // requires `derive` feature
+#[derive(ValueEnum, Clone, Debug, Default)]
+pub enum ConnectionMethod {
+    #[default]
+    Tcp,
+    Udp,
+    Icmp,
+    Http,
+}
+
+impl Display for ConnectionMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConnectionMethod::Tcp => write!(f, "tcp"),
+            ConnectionMethod::Udp => write!(f, "udp"),
+            ConnectionMethod::Icmp => write!(f, "icmp"),
+            ConnectionMethod::Http => write!(f, "http"),
+        }
+    }
+}
+
+#[derive(Debug, Parser)]
 #[command(name = "nk")]
 #[command(bin_name = "nk")]
 #[command(about = "Net Kraken, network connectivity tester.", long_about = None)]
@@ -36,26 +56,6 @@ pub struct Cli {
     /// Listen as a server
     #[clap(short, long, default_value_t = false)]
     pub listen: bool,
-}
-
-#[derive(ValueEnum, Clone, Debug, Default)]
-pub enum ConnectionMethod {
-    #[default]
-    Tcp,
-    Udp,
-    Icmp,
-    Http,
-}
-
-impl Display for ConnectionMethod {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ConnectionMethod::Tcp => write!(f, "tcp"),
-            ConnectionMethod::Udp => write!(f, "udp"),
-            ConnectionMethod::Icmp => write!(f, "icmp"),
-            ConnectionMethod::Http => write!(f, "http"),
-        }
-    }
 }
 
 pub async fn init_cli() -> Result<()> {
