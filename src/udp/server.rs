@@ -1,7 +1,10 @@
 use anyhow::Result;
 use tokio::net::UdpSocket;
 
-use crate::konst::{BIND_ADDR, BIND_PORT};
+use tracing::event;
+use tracing::Level;
+
+use crate::konst::{APP_NAME, BIND_ADDR, BIND_PORT};
 use crate::util::parser::parse_ipaddr;
 
 pub struct UdpServer {
@@ -24,7 +27,7 @@ impl UdpServer {
         loop {
             let len = sock.recv_buf(&mut buffer).await?;
             let data = String::from_utf8_lossy(&buffer[..len]);
-            println!("RECV: {data}");
+            event!(target: APP_NAME, Level::INFO, "{data}");
             buffer.clear();
         }
     }

@@ -52,7 +52,6 @@ impl UdpClient {
             socket.peer_addr()?.to_string(),
         );
         socket.send(conn_string.as_bytes()).await?;
-        println!("{conn_string}");
         Ok(())
     }
 }

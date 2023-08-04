@@ -3,7 +3,10 @@ use anyhow::Result;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
 
-use crate::konst::{BIND_ADDR, BIND_PORT};
+use tracing::event;
+use tracing::Level;
+
+use crate::konst::{APP_NAME, BIND_ADDR, BIND_PORT};
 use crate::util::parser::parse_ipaddr;
 
 pub struct TcpServer {
@@ -27,7 +30,7 @@ impl TcpServer {
             let (mut stream, _) = listener.accept().await?;
             let len = stream.read_to_end(&mut buffer).await?;
             let data = String::from_utf8_lossy(&buffer[..len]);
-            println!("RECV: {data}");
+            event!(target: APP_NAME, Level::INFO, "{data}");
             buffer.clear();
         }
     }
