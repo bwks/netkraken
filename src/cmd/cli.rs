@@ -6,6 +6,7 @@ use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use tokio::net::{TcpSocket, UdpSocket};
 
+use crate::udp::client::UdpClient;
 use crate::udp::server::UdpServer;
 use crate::util::parser::parse_ipaddr;
 use crate::util::text::get_conn_string;
@@ -104,17 +105,13 @@ pub async fn init_cli() -> Result<()> {
                 };
                 udp_server.listen().await?;
             } else {
-                let dst_ip_port_str = format!("{}:{}", dst_addr, cli.dst_port);
-
-                let socket = UdpSocket::bind(bind_addr).await?;
-                socket.connect(dst_ip_port_str).await?;
-                let conn_string = get_conn_string(
-                    cli.method.to_string().to_uppercase(),
-                    socket.local_addr()?.to_string(),
-                    socket.peer_addr()?.to_string(),
+                let udp_client = UdpClient::new(
+                    cli.dst_host,
+                    cli.dst_port,
+                    Some(cli.src_addr),
+                    Some(cli.src_port),
                 );
-                socket.send(conn_string.as_bytes()).await?;
-                println!("{conn_string}")
+                udp_client.connect().await?;
             }
         }
     }
