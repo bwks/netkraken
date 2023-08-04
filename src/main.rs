@@ -13,7 +13,7 @@ use crate::cmd::cli::init_cli;
 use crate::konst::APP_NAME;
 
 #[tokio::main]
-async fn main() {
+async fn main() -> ExitCode {
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
             std::env::var("RUST_LOG").unwrap_or_else(|_| format!("{APP_NAME}=info").into()),
@@ -32,5 +32,5 @@ async fn main() {
             }
             ExitCode::from(1)
         }
-    };
+    }
 }
