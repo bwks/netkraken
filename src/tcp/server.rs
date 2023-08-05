@@ -6,7 +6,9 @@ use tokio::net::TcpListener;
 use tracing::event;
 use tracing::Level;
 
+use crate::core::common::ConnectMessage;
 use crate::core::konst::{APP_NAME, BIND_ADDR, BIND_PORT};
+use crate::util::message::get_conn_string;
 use crate::util::parser::parse_ipaddr;
 
 pub struct TcpServer {
@@ -27,10 +29,18 @@ impl TcpServer {
 
         let mut buffer = Vec::with_capacity(64);
         loop {
+            // Receive
             let (mut stream, _) = listener.accept().await?;
             let len = stream.read_to_end(&mut buffer).await?;
-            let data = String::from_utf8_lossy(&buffer[..len]);
-            event!(target: APP_NAME, Level::INFO, "{data}");
+            let data: ConnectMessage =
+                serde_json::from_str(&String::from_utf8_lossy(&buffer[..len]))?;
+            let output =
+                get_conn_string(data.protocol.to_uppercase(), data.source, data.destination);
+            event!(target: APP_NAME, Level::INFO, "{output}");
+
+            // Send
+
+            // Flush buffer
             buffer.clear();
         }
     }
