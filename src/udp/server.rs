@@ -4,7 +4,7 @@ use tokio::net::UdpSocket;
 use tracing::event;
 use tracing::Level;
 
-use crate::konst::{APP_NAME, BIND_ADDR, BIND_PORT};
+use crate::core::konst::{APP_NAME, BIND_ADDR, BIND_PORT};
 use crate::util::parser::parse_ipaddr;
 
 pub struct UdpServer {

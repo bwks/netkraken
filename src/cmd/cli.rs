@@ -3,6 +3,7 @@ use std::fmt::Display;
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 
+use crate::core::common::PingOptions;
 use crate::tcp::client::TcpClient;
 use crate::tcp::server::TcpServer;
 use crate::udp::client::UdpClient;
@@ -53,6 +54,14 @@ pub struct Cli {
     #[clap(long, default_value_t = 0)]
     pub src_port: u16,
 
+    /// Repeat count (0 for infinite)
+    #[clap(short, long, default_value_t = 4)]
+    pub repeat: u8,
+
+    /// Interval between pings (in milliseconds)
+    #[clap(short, long, default_value_t = 1000)]
+    pub interval: u16,
+
     /// Listen as a server
     #[clap(short, long, default_value_t = false)]
     pub listen: bool,
@@ -72,11 +81,16 @@ pub async fn init_cli() -> Result<()> {
                 };
                 tcp_server.listen().await?;
             } else {
+                let mut tcp_client_options = PingOptions::default();
+                tcp_client_options.repeat = cli.repeat;
+                tcp_client_options.interval = cli.interval;
+
                 let tcp_client = TcpClient::new(
                     cli.dst_host,
                     cli.dst_port,
                     Some(cli.src_addr),
                     Some(cli.src_port),
+                    tcp_client_options,
                 );
                 tcp_client.connect().await?;
             }

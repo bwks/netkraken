@@ -1,5 +1,5 @@
 mod cmd;
-mod konst;
+mod core;
 mod tcp;
 mod udp;
 mod util;
@@ -10,7 +10,7 @@ use tracing::{event, Level};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 use crate::cmd::cli::init_cli;
-use crate::konst::APP_NAME;
+use crate::core::konst::APP_NAME;
 
 #[tokio::main]
 async fn main() -> ExitCode {

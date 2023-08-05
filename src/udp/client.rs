@@ -4,7 +4,7 @@ use anyhow::Result;
 
 use tokio::net::UdpSocket;
 
-use crate::konst::{BIND_ADDR, BIND_PORT};
+use crate::core::konst::{BIND_ADDR, BIND_PORT};
 use crate::util::parser::parse_ipaddr;
 use crate::util::text::get_conn_string;
 
