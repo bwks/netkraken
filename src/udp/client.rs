@@ -5,8 +5,8 @@ use anyhow::Result;
 use tokio::net::UdpSocket;
 
 use crate::core::konst::{BIND_ADDR, BIND_PORT};
+use crate::util::message::get_conn_string;
 use crate::util::parser::parse_ipaddr;
-use crate::util::text::get_conn_string;
 
 pub struct UdpClient {
     pub dst_addr: String,

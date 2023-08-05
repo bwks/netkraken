@@ -4,11 +4,11 @@ use anyhow::Result;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpSocket;
 use tokio::time::{sleep, Duration};
+use uuid::Uuid;
 
-use crate::core::common::PingOptions;
+use crate::core::common::{ConnectMessage, ConnectMethod, PingOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT};
 use crate::util::parser::parse_ipaddr;
-use crate::util::text::get_conn_string;
 
 #[derive(Debug)]
 pub struct TcpClient {
@@ -51,6 +51,7 @@ impl TcpClient {
         let bind_addr = SocketAddr::new(src_addr, self.src_port);
         let connect_addr = SocketAddr::new(dst_addr, self.dst_port);
 
+        let uuid = Uuid::new_v4();
         let mut count: u8 = 1;
         loop {
             let socket = match src_addr.is_ipv4() {
@@ -60,13 +61,17 @@ impl TcpClient {
             socket.bind(bind_addr)?;
 
             let mut stream = socket.connect(connect_addr).await?;
-            let conn_string = get_conn_string(
-                "TCP".to_owned(),
-                stream.local_addr()?.to_string(),
-                stream.peer_addr()?.to_string(),
-            );
 
-            stream.write_all(conn_string.as_bytes()).await?;
+            let mut connect_message = ConnectMessage::new(
+                &stream.local_addr()?.to_string(),
+                &stream.peer_addr()?.to_string(),
+                ConnectMethod::Tcp,
+            );
+            // Set the uuid to connect task streams
+            connect_message.uuid = uuid.to_string();
+            let json_message = serde_json::to_string(&connect_message)?;
+
+            stream.write_all(json_message.as_bytes()).await?;
 
             sleep(Duration::from_millis(self.options.interval.into())).await;
             if self.options.repeat == 0 {
