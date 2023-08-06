@@ -4,6 +4,7 @@ use anyhow::Result;
 
 use tokio::net::UdpSocket;
 
+use crate::core::common::ConnectMethod;
 use crate::core::konst::{BIND_ADDR, BIND_PORT};
 use crate::util::message::get_conn_string;
 use crate::util::parser::parse_ipaddr;
@@ -47,9 +48,9 @@ impl UdpClient {
         let socket = UdpSocket::bind(bind_addr).await?;
         socket.connect(dst_ip_port_str).await?;
         let conn_string = get_conn_string(
-            "UDP".to_owned(),
-            socket.local_addr()?.to_string(),
-            socket.peer_addr()?.to_string(),
+            ConnectMethod::TCP,
+            &socket.local_addr()?.to_string(),
+            &socket.peer_addr()?.to_string(),
         );
         socket.send(conn_string.as_bytes()).await?;
         Ok(())

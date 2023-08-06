@@ -6,7 +6,7 @@ use tokio::net::TcpSocket;
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
-use crate::core::common::{ConnectMessage, ConnectMethod, PingOptions};
+use crate::core::common::{ConnectMessage, ConnectMethod, OutputOptions, PingOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT};
 use crate::util::parser::parse_ipaddr;
 
@@ -16,7 +16,8 @@ pub struct TcpClient {
     pub dst_port: u16,
     pub src_addr: String,
     pub src_port: u16,
-    pub options: PingOptions,
+    pub output_options: OutputOptions,
+    pub ping_options: PingOptions,
 }
 
 impl TcpClient {
@@ -25,7 +26,8 @@ impl TcpClient {
         dst_port: u16,
         src_addr: Option<String>,
         src_port: Option<u16>,
-        options: PingOptions,
+        output_options: OutputOptions,
+        ping_options: PingOptions,
     ) -> TcpClient {
         let src_addr = match src_addr {
             Some(x) => x,
@@ -40,7 +42,8 @@ impl TcpClient {
             dst_port,
             src_addr,
             src_port,
-            options,
+            output_options,
+            ping_options,
         }
     }
 
@@ -54,6 +57,8 @@ impl TcpClient {
         let uuid = Uuid::new_v4();
         let mut count: u8 = 1;
         loop {
+            sleep(Duration::from_millis(self.ping_options.interval.into())).await;
+
             let socket = match src_addr.is_ipv4() {
                 true => TcpSocket::new_v4()?,
                 false => TcpSocket::new_v6()?,
@@ -65,18 +70,17 @@ impl TcpClient {
             let mut connect_message = ConnectMessage::new(
                 &stream.local_addr()?.to_string(),
                 &stream.peer_addr()?.to_string(),
-                ConnectMethod::Tcp,
-            );
-            // Set the uuid to connect task streams
+                ConnectMethod::TCP,
+            )?;
+
             connect_message.uuid = uuid.to_string();
             let json_message = serde_json::to_string(&connect_message)?;
 
             stream.write_all(json_message.as_bytes()).await?;
 
-            sleep(Duration::from_millis(self.options.interval.into())).await;
-            if self.options.repeat == 0 {
+            if self.ping_options.repeat == 0 {
                 continue;
-            } else if self.options.repeat == count {
+            } else if self.ping_options.repeat == count {
                 break;
             } else {
                 count += 1;
