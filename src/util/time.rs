@@ -15,3 +15,14 @@ pub fn time_now_utc() -> String {
     let time_now = OffsetDateTime::now_utc();
     time_now.to_string()
 }
+
+pub fn calc_connect_ms(pre_timestamp: u128, post_timestamp: u128) -> f64 {
+    match post_timestamp < pre_timestamp {
+        // clocks are not sufficiently synced to calculate difference
+        true => -1.0,
+        false => {
+            let us = post_timestamp - pre_timestamp;
+            us as f64 / 1000.0
+        }
+    }
+}
