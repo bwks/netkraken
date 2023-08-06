@@ -46,6 +46,7 @@ impl Default for OutputOptions {
 pub struct PingOptions {
     pub repeat: u8,
     pub interval: u16,
+    pub discover: bool,
 }
 
 impl Default for PingOptions {
@@ -53,8 +54,16 @@ impl Default for PingOptions {
         Self {
             repeat: 4,
             interval: 1000,
+            discover: false,
         }
     }
+}
+
+#[derive(Clone, Default, Deserialize, Serialize)]
+pub struct HelloMessage {
+    syn: bool,
+    syn_ack: bool,
+    ack: bool,
 }
 
 #[derive(Clone, Default, Deserialize, Serialize)]

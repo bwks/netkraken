@@ -43,6 +43,8 @@ impl TcpServer {
                 let len = reader.read_to_end(&mut buffer).await?;
                 let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
+                // Discover netkracken peer.
+
                 // We only expect to receive a `ConnectMessage` payload from a netkraken peer.
                 // For non-netkraken peers we consider any payload to be malformed.
                 let mut data: ConnectMessage = match serde_json::from_str(data_string) {

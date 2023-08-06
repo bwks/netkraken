@@ -52,6 +52,10 @@ pub struct Cli {
     /// Silence output
     #[clap(short, long, default_value_t = false)]
     pub quiet: bool,
+
+    /// Disable NetKraken peer discovery
+    #[clap(short, long, default_value_t = false)]
+    pub discover: bool,
 }
 
 pub async fn init_cli() -> Result<()> {
@@ -60,6 +64,7 @@ pub async fn init_cli() -> Result<()> {
     let mut ping_options = PingOptions::default();
     ping_options.repeat = cli.repeat;
     ping_options.interval = cli.interval;
+    ping_options.discover = cli.discover;
 
     let mut output_options = OutputOptions::default();
     output_options.json = cli.json;

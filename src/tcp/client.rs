@@ -6,7 +6,9 @@ use tokio::net::TcpSocket;
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
-use crate::core::common::{ConnectMessage, ConnectMethod, OutputOptions, PingOptions};
+use crate::core::common::{
+    ConnectMessage, ConnectMethod, HelloMessage, OutputOptions, PingOptions,
+};
 use crate::core::konst::{BIND_ADDR, BIND_PORT};
 use crate::util::message::get_conn_string;
 use crate::util::parser::parse_ipaddr;
@@ -55,13 +57,13 @@ impl TcpClient {
 
         let bind_addr = SocketAddr::new(src_addr, self.src_port);
         let connect_addr = SocketAddr::new(dst_addr, self.dst_port);
-        let ping_interval: u64 = self.ping_options.interval.into();
+        let ping_interval = self.ping_options.interval.into();
+        let nk_peer_discovery = self.ping_options.discover;
 
+        let mut is_nk_peer = false;
         let uuid = Uuid::new_v4();
         let mut count: u8 = 1;
         loop {
-            sleep(Duration::from_millis(ping_interval)).await;
-
             // tokio::spawn(async move {
             let socket = match src_addr.is_ipv4() {
                 true => TcpSocket::new_v4()?,
@@ -73,23 +75,33 @@ impl TcpClient {
             let pre_conn_timestamp = time_now_us()?;
 
             let mut stream = socket.connect(connect_addr).await?;
+            let local_addr = &stream.local_addr()?.to_string();
+            let peer_addr = &stream.peer_addr()?.to_string();
 
             // Record timestamp after connection
             let post_conn_timestamp = time_now_us()?;
 
             let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
 
-            let output = get_conn_string(
-                ConnectMethod::TCP,
-                &stream.local_addr()?.to_string(),
-                &stream.peer_addr()?.to_string(),
-            );
+            let output = get_conn_string(ConnectMethod::TCP, &local_addr, &peer_addr);
 
             // Future file logging
             // event!(target: APP_NAME, Level::INFO, "{output} {latency}ms");
             println!("{} {}ms", output, connection_time);
 
+            // Discover NetKraken peer.
+            if nk_peer_discovery {
+                println!("connected from: {} to: {}", local_addr, peer_addr);
+                println!("warming up");
+
+                let hello_msg = HelloMessage::default();
+                // send and handle hello message
+            }
+
             /* TODO: NK <-> NK connection
+
+
+
             let mut connect_message = ConnectMessage::new(
                 &stream.local_addr()?.to_string(),
                 &stream.peer_addr()?.to_string(),
@@ -135,6 +147,8 @@ impl TcpClient {
             println!("{} {} {}ms", data.uuid, output, latency);
 
              */
+
+            sleep(Duration::from_millis(ping_interval)).await;
 
             if self.ping_options.repeat == 0 {
                 continue;
