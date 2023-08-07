@@ -6,6 +6,7 @@ use crate::tcp::client::TcpClient;
 use crate::tcp::server::TcpServer;
 use crate::udp::client::UdpClient;
 use crate::udp::server::UdpServer;
+use crate::util::message::cli_header_msg;
 
 #[derive(Debug, Parser)]
 #[command(name = "nk")]
@@ -35,7 +36,7 @@ pub struct Cli {
 
     /// Repeat count (0 for infinite)
     #[clap(short, long, default_value_t = 4)]
-    pub repeat: u8,
+    pub repeat: u16,
 
     /// Interval between pings (in milliseconds)
     #[clap(short, long, default_value_t = 1000)]
@@ -59,6 +60,7 @@ pub struct Cli {
 }
 
 pub async fn init_cli() -> Result<()> {
+    cli_header_msg();
     let cli = Cli::parse();
 
     let mut ping_options = PingOptions::default();

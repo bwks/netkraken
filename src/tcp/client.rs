@@ -1,8 +1,8 @@
 use std::net::SocketAddr;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpSocket;
+use tokio::net::{TcpSocket, TcpStream};
 use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
@@ -10,7 +10,9 @@ use crate::core::common::{
     ConnectMessage, ConnectMethod, HelloMessage, OutputOptions, PingOptions,
 };
 use crate::core::konst::{BIND_ADDR, BIND_PORT};
-use crate::util::message::get_conn_string;
+use crate::util::message::{
+    client_conn_success_msg, client_err_msg, get_conn_string, ping_header_msg,
+};
 use crate::util::parser::parse_ipaddr;
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 
@@ -62,9 +64,21 @@ impl TcpClient {
 
         let mut is_nk_peer = false;
         let uuid = Uuid::new_v4();
-        let mut count: u8 = 1;
+        let mut count: u16 = 0;
+
+        ping_header_msg(ConnectMethod::TCP, connect_addr.to_string());
+
         loop {
-            // tokio::spawn(async move {
+            if count == u16::MAX {
+                println!("max ping count reached");
+                break;
+            } else if self.ping_options.repeat != 0 && count >= self.ping_options.repeat {
+                break;
+            } else {
+                sleep(Duration::from_millis(ping_interval)).await;
+                count += 1;
+            }
+
             let socket = match src_addr.is_ipv4() {
                 true => TcpSocket::new_v4()?,
                 false => TcpSocket::new_v6()?,
@@ -74,20 +88,41 @@ impl TcpClient {
             // record timestamp before connection
             let pre_conn_timestamp = time_now_us()?;
 
-            let mut stream = socket.connect(connect_addr).await?;
-            let local_addr = &stream.local_addr()?.to_string();
-            let peer_addr = &stream.peer_addr()?.to_string();
+            let stream = match socket.connect(connect_addr).await {
+                Ok(s) => s,
+                Err(e) => match e.kind() {
+                    std::io::ErrorKind::ConnectionRefused => {
+                        client_err_msg(count, "connection refused");
+                        continue;
+                    }
+                    std::io::ErrorKind::TimedOut => {
+                        client_err_msg(count, "connection timeout");
+                        continue;
+                    }
+                    _ => bail!(e),
+                },
+            };
 
             // Record timestamp after connection
             let post_conn_timestamp = time_now_us()?;
 
+            // Calculate the round trip time
             let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
 
-            let output = get_conn_string(ConnectMethod::TCP, &local_addr, &peer_addr);
+            let local_addr = &stream.local_addr()?.to_string();
+            let peer_addr = &stream.peer_addr()?.to_string();
+
+            client_conn_success_msg(
+                count,
+                ConnectMethod::TCP,
+                &local_addr,
+                &peer_addr,
+                connection_time,
+            );
 
             // Future file logging
             // event!(target: APP_NAME, Level::INFO, "{output} {latency}ms");
-            println!("{} {}ms", output, connection_time);
+            // println!("{} rtt={}ms", output, connection_time);
 
             // Discover NetKraken peer.
             if nk_peer_discovery {
@@ -147,16 +182,6 @@ impl TcpClient {
             println!("{} {} {}ms", data.uuid, output, latency);
 
              */
-
-            sleep(Duration::from_millis(ping_interval)).await;
-
-            if self.ping_options.repeat == 0 {
-                continue;
-            } else if self.ping_options.repeat == count {
-                break;
-            } else {
-                count += 1;
-            }
         }
         Ok(())
     }

@@ -44,7 +44,7 @@ impl Default for OutputOptions {
 
 #[derive(Debug)]
 pub struct PingOptions {
-    pub repeat: u8,
+    pub repeat: u16,
     pub interval: u16,
     pub discover: bool,
 }

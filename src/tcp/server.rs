@@ -4,11 +4,12 @@ use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 
-use tracing::event;
-use tracing::Level;
+// use tracing::event;
+// use tracing::Level;
 
 use crate::core::common::{ConnectMessage, ConnectMethod, OutputOptions};
-use crate::core::konst::{APP_NAME, BIND_ADDR, BIND_PORT};
+// use crate::core::konst::{APP_NAME, BIND_ADDR, BIND_PORT};
+use crate::core::konst::{BIND_ADDR, BIND_PORT};
 use crate::util::message::get_conn_string;
 use crate::util::parser::parse_ipaddr;
 use crate::util::time::{time_now_us, time_now_utc};
@@ -73,7 +74,7 @@ impl TcpServer {
 
                     // Future file logging
                     // event!(target: APP_NAME, Level::INFO, "{output} -1ms");
-                    println!("{} -1ms", output)
+                    println!("{} time=-1ms", output)
 
                 // netkraken clients
                 } else {
@@ -96,7 +97,7 @@ impl TcpServer {
 
                         // Future file logging
                         // event!(target: APP_NAME, Level::INFO, "{output} {latency}ms");
-                        println!("{} {} {}ms", data.uuid, output, latency);
+                        println!("{} {} cst={}ms", data.uuid, output, latency);
                     }
                 }
 
