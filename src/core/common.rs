@@ -81,6 +81,7 @@ pub struct ConnectMessage {
 }
 
 impl ConnectMessage {
+    #[allow(dead_code)]
     pub fn new(
         source: &String,
         destination: &String,

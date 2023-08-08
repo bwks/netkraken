@@ -54,8 +54,8 @@ pub struct Cli {
     #[clap(short, long, default_value_t = false)]
     pub quiet: bool,
 
-    /// Disable NetKraken peer discovery
-    #[clap(short, long, default_value_t = true)]
+    /// NetKraken peer discovery
+    #[clap(short, long, default_value_t = false)]
     pub discover: bool,
 }
 

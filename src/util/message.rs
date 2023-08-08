@@ -29,7 +29,7 @@ pub fn client_err_msg(sequence: u16, message: &str) {
     println!("seq={} err={}", sequence, message)
 }
 
-/// Prints out a connection success message
+/// Prints out a client connection success message
 pub fn client_conn_success_msg(
     sequence: u16,
     protocol: ConnectMethod,
@@ -44,5 +44,15 @@ pub fn client_conn_success_msg(
         source,
         destination,
         time,
+    )
+}
+
+/// Prints out a server connection success message
+pub fn server_conn_success_msg(protocol: ConnectMethod, source: &String, destination: &String) {
+    println!(
+        "proto={} src={} dst={}",
+        protocol.to_string().to_uppercase(),
+        source,
+        destination,
     )
 }

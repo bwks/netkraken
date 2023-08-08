@@ -1,20 +1,15 @@
 use std::net::SocketAddr;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpSocket, TcpStream};
 use tokio::time::{sleep, Duration};
-use uuid::Uuid;
 
-use crate::core::common::{
-    ConnectMessage, ConnectMethod, HelloMessage, OutputOptions, PingOptions,
-};
+use crate::core::common::{ConnectMethod, HelloMessage, OutputOptions, PingOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT};
-use crate::util::message::{
-    client_conn_success_msg, client_err_msg, get_conn_string, ping_header_msg,
-};
+use crate::util::message::{client_conn_success_msg, client_err_msg, ping_header_msg};
 use crate::util::parser::parse_ipaddr;
-use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
+use crate::util::time::{calc_connect_ms, time_now_us};
 
 #[derive(Debug)]
 pub struct TcpClient {
@@ -63,7 +58,6 @@ impl TcpClient {
         let nk_peer_discovery = self.ping_options.discover;
 
         let mut is_nk_peer = false;
-        let uuid = Uuid::new_v4();
         let mut count: u16 = 0;
 
         ping_header_msg(ConnectMethod::TCP, connect_addr.to_string());
@@ -78,29 +72,14 @@ impl TcpClient {
                 sleep(Duration::from_millis(ping_interval)).await;
                 count += 1;
             }
-
-            let socket = match src_addr.is_ipv4() {
-                true => TcpSocket::new_v4()?,
-                false => TcpSocket::new_v6()?,
-            };
-            socket.bind(bind_addr)?;
+            let src_socket = get_tcp_socket(bind_addr).await?;
 
             // record timestamp before connection
             let pre_conn_timestamp = time_now_us()?;
 
-            let mut stream = match socket.connect(connect_addr).await {
-                Ok(s) => s,
-                Err(e) => match e.kind() {
-                    std::io::ErrorKind::ConnectionRefused => {
-                        client_err_msg(count, "connection refused");
-                        continue;
-                    }
-                    std::io::ErrorKind::TimedOut => {
-                        client_err_msg(count, "connection timeout");
-                        continue;
-                    }
-                    _ => bail!(e),
-                },
+            let mut stream = match tcp_connect(count, src_socket, connect_addr).await {
+                Some(s) => s,
+                None => continue,
             };
 
             // Record timestamp after connection
@@ -125,9 +104,9 @@ impl TcpClient {
             // println!("{} rtt={}ms", output, connection_time);
 
             // Discover NetKraken peer.
-            if nk_peer_discovery {
-                // println!("connected from: {} to: {}", local_addr, peer_addr);
-                println!("warming up");
+            // Only run on the first connection
+            if nk_peer_discovery && count == 1 {
+                // println!("warming up");
 
                 let mut hello_msg = HelloMessage::default();
                 hello_msg.ping = true;
@@ -143,62 +122,61 @@ impl TcpClient {
                 let len = reader.read_to_end(&mut buffer).await?;
                 let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
-                // println!("{}", data_string);
-
-                let data: HelloMessage = serde_json::from_str(data_string)?;
-                println!("{:#?}", data);
+                let data: HelloMessage = match serde_json::from_str(data_string) {
+                    Ok(d) => {
+                        is_nk_peer = true;
+                        d
+                    }
+                    Err(_) => {
+                        // println!("non-nk-peer");
+                        continue;
+                    }
+                };
             }
 
-            /* TODO: NK <-> NK connection
-
-
-
-            let mut connect_message = ConnectMessage::new(
-                &stream.local_addr()?.to_string(),
-                &stream.peer_addr()?.to_string(),
-                ConnectMethod::TCP,
-            )?;
-
-            connect_message.uuid = uuid.to_string();
-            let json_message = serde_json::to_string(&connect_message)?;
-
-            let (mut reader, mut writer) = stream.split();
-
-            writer.write_all(json_message.as_bytes()).await?;
-            writer.shutdown().await?;
-
-            // read
-            let mut buffer: Vec<u8> = Vec::with_capacity(64);
-            let len = reader.read_to_end(&mut buffer).await?;
-            let data_string = &String::from_utf8_lossy(&buffer[..len]);
-
-            // println!("{}", data_string);
-
-            let mut data: ConnectMessage = serde_json::from_str(data_string)?;
-
-            data.rtt_time_utc = time_now_utc();
-            data.rtt_timestamp = time_now_us()?;
-
-            // Calculate the client -> server latency
-            let latency = match data.send_timestamp > data.rtt_timestamp {
-                // if `send_timestamp` is greater than `receive_timestamp` clocks
-                // are not in sync so latency cannot be calculated.
-                true => "-1".to_owned(),
-                false => {
-                    // Convert microseconds to milliseconds
-                    let us = data.rtt_timestamp - data.send_timestamp;
-                    format!("{}", us as f64 / 1000.0)
-                }
-            };
-
-            let output = get_conn_string(ConnectMethod::TCP, &data.source, &data.destination);
-
-            // Future file logging
-            // event!(target: APP_NAME, Level::INFO, "{output} {latency}ms");
-            println!("{} {} {}ms", data.uuid, output, latency);
-
-             */
+            // TODO: NK <-> NK connection
+            if is_nk_peer {}
         }
         Ok(())
     }
+}
+
+// async fn tcp_connect(bind_addr: TcpSocket, connect_addr: TcpSocket) {
+
+fn handle_connect_error(count: u16, error: std::io::Error) {
+    match error.kind() {
+        std::io::ErrorKind::ConnectionRefused => {
+            client_err_msg(count, "connection refused");
+        }
+        std::io::ErrorKind::TimedOut => {
+            client_err_msg(count, "connection timeout");
+        }
+        _ => {
+            client_err_msg(count, &format!("unknown connection error {error}"));
+        }
+    }
+}
+
+async fn tcp_connect(
+    count: u16,
+    src_socket: TcpSocket,
+    connect_addr: SocketAddr,
+) -> Option<TcpStream> {
+    let stream = match src_socket.connect(connect_addr).await {
+        Ok(s) => s,
+        Err(e) => {
+            handle_connect_error(count, e);
+            return None;
+        }
+    };
+    Some(stream)
+}
+
+async fn get_tcp_socket(bind_addr: SocketAddr) -> Result<TcpSocket> {
+    let socket = match bind_addr.is_ipv4() {
+        true => TcpSocket::new_v4()?,
+        false => TcpSocket::new_v6()?,
+    };
+    socket.bind(bind_addr)?;
+    Ok(socket)
 }

@@ -7,12 +7,11 @@ use tokio::net::TcpListener;
 // use tracing::event;
 // use tracing::Level;
 
-use crate::core::common::{ConnectMessage, ConnectMethod, OutputOptions};
-// use crate::core::konst::{APP_NAME, BIND_ADDR, BIND_PORT};
+use crate::core::common::HelloMessage;
+use crate::core::common::{ConnectMethod, OutputOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT};
-use crate::util::message::get_conn_string;
+use crate::util::message::server_conn_success_msg;
 use crate::util::parser::parse_ipaddr;
-use crate::util::time::{time_now_us, time_now_utc};
 
 pub struct TcpServer {
     pub listen_addr: String,
@@ -32,9 +31,15 @@ impl TcpServer {
         println!("--------------------");
 
         loop {
-            let json_output_flag = self.output_options.json;
+            let _json_output_flag = self.output_options.json;
             // Receive stream
             let (mut stream, _) = listener.accept().await?;
+
+            server_conn_success_msg(
+                ConnectMethod::TCP,
+                &stream.peer_addr()?.to_string(),
+                &stream.local_addr()?.to_string(),
+            );
 
             tokio::spawn(async move {
                 let mut buffer = Vec::with_capacity(64);
@@ -44,67 +49,13 @@ impl TcpServer {
                 let len = reader.read_to_end(&mut buffer).await?;
                 let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
-                println!("{}", data_string);
+                // Add echo handler
 
                 // Discover netkracken peer.
+                let mut hello_msg: HelloMessage = serde_json::from_str(data_string)?;
+                hello_msg.pong = true;
 
-                // We only expect to receive a `ConnectMessage` payload from a netkraken peer.
-                // For non-netkraken peers we consider any payload to be malformed.
-                let mut data: ConnectMessage = match serde_json::from_str(data_string) {
-                    Ok(d) => d,
-                    Err(_) => {
-                        let message = ConnectMessage {
-                            source: reader.peer_addr()?.to_string(),
-                            destination: reader.local_addr()?.to_string(),
-                            malformed: true,
-                            ..Default::default()
-                        };
-                        message
-                    }
-                };
-
-                // set the receiver timestamps
-                data.receive_time_utc = time_now_utc();
-                data.receive_timestamp = time_now_us()?;
-
-                let json_data = serde_json::to_string(&data)?;
-
-                // non-netkraken clients
-                if data.malformed {
-                    let output =
-                        get_conn_string(ConnectMethod::TCP, &data.source, &data.destination);
-
-                    // Future file logging
-                    // event!(target: APP_NAME, Level::INFO, "{output} -1ms");
-                    println!("{} time=-1ms", output)
-
-                // netkraken clients
-                } else {
-                    if json_output_flag {
-                        println!("{json_data}")
-                    } else {
-                        // Calculate the client -> server latency
-                        let latency = match data.send_timestamp > data.receive_timestamp {
-                            // if `send_timestamp` is greater than `receive_timestamp` clocks
-                            // are not in sync so latency cannot be calculated.
-                            true => "-1".to_owned(),
-                            false => {
-                                // Convert microseconds to milliseconds
-                                let us = data.receive_timestamp - data.send_timestamp;
-                                format!("{}", us as f64 / 1000.0)
-                            }
-                        };
-                        let output =
-                            get_conn_string(ConnectMethod::TCP, &data.source, &data.destination);
-
-                        // Future file logging
-                        // event!(target: APP_NAME, Level::INFO, "{output} {latency}ms");
-                        println!("{} {} cst={}ms", data.uuid, output, latency);
-                    }
-                }
-
-                // Send
-                let json_message = serde_json::to_string(&data)?;
+                let json_message = serde_json::to_string(&hello_msg)?;
                 writer.write_all(json_message.as_bytes()).await?;
 
                 // Flush buffer

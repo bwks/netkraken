@@ -11,6 +11,7 @@ pub fn time_now_us() -> Result<u128> {
 }
 
 /// Get the current date and time in UTC
+#[allow(dead_code)]
 pub fn time_now_utc() -> String {
     let time_now = OffsetDateTime::now_utc();
     time_now.to_string()
