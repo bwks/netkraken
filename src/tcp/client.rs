@@ -88,7 +88,7 @@ impl TcpClient {
             // record timestamp before connection
             let pre_conn_timestamp = time_now_us()?;
 
-            let stream = match socket.connect(connect_addr).await {
+            let mut stream = match socket.connect(connect_addr).await {
                 Ok(s) => s,
                 Err(e) => match e.kind() {
                     std::io::ErrorKind::ConnectionRefused => {
@@ -126,11 +126,27 @@ impl TcpClient {
 
             // Discover NetKraken peer.
             if nk_peer_discovery {
-                println!("connected from: {} to: {}", local_addr, peer_addr);
+                // println!("connected from: {} to: {}", local_addr, peer_addr);
                 println!("warming up");
 
-                let hello_msg = HelloMessage::default();
+                let mut hello_msg = HelloMessage::default();
+                hello_msg.ping = true;
                 // send and handle hello message
+
+                let json_hello = serde_json::to_string(&hello_msg)?;
+                let (mut reader, mut writer) = stream.split();
+
+                writer.write_all(json_hello.as_bytes()).await?;
+                writer.shutdown().await?;
+
+                let mut buffer: Vec<u8> = Vec::with_capacity(64);
+                let len = reader.read_to_end(&mut buffer).await?;
+                let data_string = &String::from_utf8_lossy(&buffer[..len]);
+
+                // println!("{}", data_string);
+
+                let data: HelloMessage = serde_json::from_str(data_string)?;
+                println!("{:#?}", data);
             }
 
             /* TODO: NK <-> NK connection

@@ -44,6 +44,8 @@ impl TcpServer {
                 let len = reader.read_to_end(&mut buffer).await?;
                 let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
+                println!("{}", data_string);
+
                 // Discover netkracken peer.
 
                 // We only expect to receive a `ConnectMessage` payload from a netkraken peer.

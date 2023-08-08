@@ -59,14 +59,13 @@ impl Default for PingOptions {
     }
 }
 
-#[derive(Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Default, Debug, Deserialize, Serialize)]
 pub struct HelloMessage {
-    syn: bool,
-    syn_ack: bool,
-    ack: bool,
+    pub ping: bool,
+    pub pong: bool,
 }
 
-#[derive(Clone, Default, Deserialize, Serialize)]
+#[derive(Clone, Default, Debug, Deserialize, Serialize)]
 pub struct ConnectMessage {
     pub uuid: String,
     pub send_time_utc: String,
