@@ -4,11 +4,14 @@ use anyhow::Result;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpSocket, TcpStream};
 use tokio::time::{sleep, Duration};
+use uuid::Uuid;
 
-use crate::core::common::{ConnectMethod, ConnectResult, HelloMessage, OutputOptions, PingOptions};
+use crate::core::common::{
+    ConnectMethod, ConnectResult, HelloMessage, NetKrakenMessage, OutputOptions, PingOptions,
+};
 use crate::core::konst::{BIND_ADDR, BIND_PORT};
 use crate::util::message::{client_conn_success_msg, client_err_msg, ping_header_msg};
-use crate::util::parser::parse_ipaddr;
+use crate::util::parser::{hello_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us};
 
 #[derive(Debug)]
@@ -58,6 +61,7 @@ impl TcpClient {
         let ping_interval = self.ping_options.interval;
         let nk_peer_discovery = self.ping_options.discover;
 
+        let uuid = Uuid::new_v4();
         let mut is_nk_peer = false;
         let mut first_loop = true;
         let mut count: u16 = 0;
@@ -114,6 +118,7 @@ impl TcpClient {
                 // println!("warming up");
 
                 let mut hello_msg = HelloMessage::default();
+                hello_msg.uuid = uuid.to_string();
                 hello_msg.ping = true;
 
                 let json_hello = serde_json::to_string(&hello_msg)?;
@@ -126,25 +131,27 @@ impl TcpClient {
                 let len = reader.read_to_end(&mut buffer).await?;
                 let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
-                let data: HelloMessage = match serde_json::from_str(data_string) {
-                    Ok(d) => {
-                        // println!("{:#?}", d);
-                        d
-                    }
-                    Err(_) => {
-                        // println!("non-nk-peer");
-                        continue;
-                    }
+                let hello_msg = match hello_msg_reader(data_string) {
+                    Some(d) => d,
+                    None => continue,
                 };
-                if data.pong {
+
+                if hello_msg.pong {
                     is_nk_peer = true;
-                    // println!("{:#?}", data)
+                    println!("{:#?}", hello_msg)
                 }
             }
 
             // TODO: NK <-> NK connection
             if is_nk_peer {
                 // println!("nk peer: {is_nk_peer}");
+                let nk_msg = NetKrakenMessage::new(
+                    &uuid.to_string(),
+                    &local_addr,
+                    &peer_addr,
+                    ConnectMethod::TCP,
+                )?;
+                println!("{:#?}", nk_msg);
             }
         }
         Ok(())

@@ -10,7 +10,7 @@ use tracing::Level;
 use crate::core::common::{ConnectMethod, ConnectResult, HelloMessage, OutputOptions};
 use crate::core::konst::{APP_NAME, BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::message::{server_conn_success_msg, server_start_msg};
-use crate::util::parser::parse_ipaddr;
+use crate::util::parser::{hello_msg_reader, parse_ipaddr};
 
 pub struct UdpServer {
     pub listen_addr: String,
@@ -60,7 +60,10 @@ impl UdpServer {
                 let data_string = &String::from_utf8_lossy(&buffer);
 
                 // Discover NetKracken peer.
-                let mut hello_msg: HelloMessage = serde_json::from_str(data_string)?;
+                let mut hello_msg = match hello_msg_reader(data_string) {
+                    Some(d) => d,
+                    None => continue,
+                };
                 hello_msg.pong = true;
 
                 let json_message = serde_json::to_string(&hello_msg)?;

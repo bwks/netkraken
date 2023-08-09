@@ -10,7 +10,7 @@ use tokio::net::TcpListener;
 use crate::core::common::{ConnectMethod, ConnectResult, HelloMessage, OutputOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT};
 use crate::util::message::{server_conn_success_msg, server_start_msg};
-use crate::util::parser::parse_ipaddr;
+use crate::util::parser::{hello_msg_reader, parse_ipaddr};
 
 pub struct TcpServer {
     pub listen_addr: String,
@@ -53,11 +53,12 @@ impl TcpServer {
                     writer.write_all(data_string.as_bytes()).await?;
                 } else {
                     // Discover NetKracken peer.
-                    let mut hello_msg: HelloMessage = serde_json::from_str(data_string)?;
-                    hello_msg.pong = true;
+                    if let Some(mut hello_msg) = hello_msg_reader(data_string) {
+                        hello_msg.pong = true;
 
-                    let json_message = serde_json::to_string(&hello_msg)?;
-                    writer.write_all(json_message.as_bytes()).await?;
+                        let json_message = serde_json::to_string(&hello_msg)?;
+                        writer.write_all(json_message.as_bytes()).await?;
+                    };
                 }
                 // Flush buffer
                 buffer.clear();

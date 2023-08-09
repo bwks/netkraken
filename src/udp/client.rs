@@ -4,12 +4,13 @@ use anyhow::Result;
 
 use tokio::net::UdpSocket;
 use tokio::time::{sleep, Duration};
+use uuid::Uuid;
 
 use crate::core::common::{ConnectMethod, ConnectResult, HelloMessage};
 use crate::core::common::{OutputOptions, PingOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::message::{client_conn_success_msg, ping_header_msg};
-use crate::util::parser::parse_ipaddr;
+use crate::util::parser::{hello_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us};
 
 pub struct UdpClient {
@@ -56,6 +57,7 @@ impl UdpClient {
 
         let ping_interval = self.ping_options.interval;
 
+        let uuid = Uuid::new_v4();
         let mut is_nk_peer = false;
         let mut first_loop = true;
         let mut count = 0;
@@ -82,6 +84,7 @@ impl UdpClient {
             let writer = reader.clone();
 
             let mut hello_msg = HelloMessage::default();
+            hello_msg.uuid = uuid.to_string();
             hello_msg.ping = true;
 
             let json_hello = serde_json::to_string(&hello_msg)?;
@@ -92,8 +95,8 @@ impl UdpClient {
             writer.connect(dst_ip_port_str.to_owned()).await?;
             writer.send(json_hello.as_bytes()).await?;
 
+            // Wait for a reply
             let mut buffer = vec![0u8; MAX_PACKET_SIZE];
-
             let (len, addr) = reader.recv_from(&mut buffer).await?;
 
             // Record timestamp after connection
@@ -115,16 +118,14 @@ impl UdpClient {
 
             let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
-            let data: HelloMessage = match serde_json::from_str(data_string) {
-                Ok(d) => d,
-                Err(_) => {
-                    // Not a NetKraken peer
-                    continue;
-                }
+            let hello_msg = match hello_msg_reader(data_string) {
+                Some(d) => d,
+                None => continue,
             };
-            if data.pong {
+
+            if hello_msg.pong {
                 is_nk_peer = true;
-                // println!("{:#?}", data)
+                // println!("{:#?}", hello_msg)
             }
 
             // TODO: NK <-> NK connection

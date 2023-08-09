@@ -104,7 +104,7 @@ impl Default for HelloMessage {
 }
 
 #[derive(Clone, Default, Debug, Deserialize, Serialize)]
-pub struct ConnectMessage {
+pub struct NetKrakenMessage {
     pub uuid: String,
     pub send_time_utc: String,
     pub send_timestamp: u128,
@@ -118,16 +118,15 @@ pub struct ConnectMessage {
     pub malformed: bool,
 }
 
-impl ConnectMessage {
+impl NetKrakenMessage {
     #[allow(dead_code)]
     pub fn new(
+        uuid: &String,
         source: &String,
         destination: &String,
         protocol: ConnectMethod,
-    ) -> Result<ConnectMessage> {
-        let uuid = Uuid::new_v4();
-
-        let message = ConnectMessage {
+    ) -> Result<NetKrakenMessage> {
+        let message = NetKrakenMessage {
             uuid: uuid.to_string(),
             protocol: protocol.to_string(),
             send_time_utc: time_now_utc(),
