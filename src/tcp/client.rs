@@ -5,7 +5,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpSocket, TcpStream};
 use tokio::time::{sleep, Duration};
 
-use crate::core::common::{ConnectMethod, HelloMessage, OutputOptions, PingOptions};
+use crate::core::common::{ConnectMethod, ConnectResult, HelloMessage, OutputOptions, PingOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT};
 use crate::util::message::{client_conn_success_msg, client_err_msg, ping_header_msg};
 use crate::util::parser::parse_ipaddr;
@@ -54,13 +54,15 @@ impl TcpClient {
 
         let bind_addr = SocketAddr::new(src_addr, self.src_port);
         let connect_addr = SocketAddr::new(dst_addr, self.dst_port);
-        let ping_interval = self.ping_options.interval.into();
+
+        let ping_interval = self.ping_options.interval;
         let nk_peer_discovery = self.ping_options.discover;
 
         let mut is_nk_peer = false;
+        let mut first_loop = true;
         let mut count: u16 = 0;
 
-        ping_header_msg(ConnectMethod::TCP, connect_addr.to_string());
+        ping_header_msg(ConnectMethod::TCP, &connect_addr.to_string());
 
         loop {
             if count == u16::MAX {
@@ -69,7 +71,10 @@ impl TcpClient {
             } else if self.ping_options.repeat != 0 && count >= self.ping_options.repeat {
                 break;
             } else {
-                sleep(Duration::from_millis(ping_interval)).await;
+                match first_loop {
+                    true => first_loop = false,
+                    false => sleep(Duration::from_millis(ping_interval.into())).await,
+                }
                 count += 1;
             }
             let src_socket = get_tcp_socket(bind_addr).await?;
@@ -77,7 +82,7 @@ impl TcpClient {
             // record timestamp before connection
             let pre_conn_timestamp = time_now_us()?;
 
-            let mut stream = match tcp_connect(count, src_socket, connect_addr).await {
+            let mut stream = match tcp_connect(src_socket, connect_addr).await {
                 Some(s) => s,
                 None => continue,
             };
@@ -92,10 +97,10 @@ impl TcpClient {
             let peer_addr = &stream.peer_addr()?.to_string();
 
             client_conn_success_msg(
-                count,
+                ConnectResult::Reply,
                 ConnectMethod::TCP,
-                &local_addr,
                 &peer_addr,
+                &local_addr,
                 connection_time,
             );
 
@@ -110,7 +115,6 @@ impl TcpClient {
 
                 let mut hello_msg = HelloMessage::default();
                 hello_msg.ping = true;
-                // send and handle hello message
 
                 let json_hello = serde_json::to_string(&hello_msg)?;
                 let (mut reader, mut writer) = stream.split();
@@ -124,7 +128,7 @@ impl TcpClient {
 
                 let data: HelloMessage = match serde_json::from_str(data_string) {
                     Ok(d) => {
-                        is_nk_peer = true;
+                        // println!("{:#?}", d);
                         d
                     }
                     Err(_) => {
@@ -132,40 +136,34 @@ impl TcpClient {
                         continue;
                     }
                 };
+                if data.pong {
+                    is_nk_peer = true;
+                    // println!("{:#?}", data)
+                }
             }
 
             // TODO: NK <-> NK connection
-            if is_nk_peer {}
+            if is_nk_peer {
+                // println!("nk peer: {is_nk_peer}");
+            }
         }
         Ok(())
     }
 }
 
-// async fn tcp_connect(bind_addr: TcpSocket, connect_addr: TcpSocket) {
-
-fn handle_connect_error(count: u16, error: std::io::Error) {
+fn handle_connect_error(error: std::io::Error) {
     match error.kind() {
-        std::io::ErrorKind::ConnectionRefused => {
-            client_err_msg(count, "connection refused");
-        }
-        std::io::ErrorKind::TimedOut => {
-            client_err_msg(count, "connection timeout");
-        }
-        _ => {
-            client_err_msg(count, &format!("unknown connection error {error}"));
-        }
+        std::io::ErrorKind::ConnectionRefused => client_err_msg(ConnectResult::Refused, error),
+        std::io::ErrorKind::TimedOut => client_err_msg(ConnectResult::Timeout, error),
+        _ => client_err_msg(ConnectResult::Unknown, error),
     }
 }
 
-async fn tcp_connect(
-    count: u16,
-    src_socket: TcpSocket,
-    connect_addr: SocketAddr,
-) -> Option<TcpStream> {
+async fn tcp_connect(src_socket: TcpSocket, connect_addr: SocketAddr) -> Option<TcpStream> {
     let stream = match src_socket.connect(connect_addr).await {
         Ok(s) => s,
         Err(e) => {
-            handle_connect_error(count, e);
+            handle_connect_error(e);
             return None;
         }
     };

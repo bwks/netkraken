@@ -7,6 +7,30 @@ use uuid::Uuid;
 
 use crate::util::time::{time_now_us, time_now_utc};
 
+pub enum ConnectResult {
+    // Success
+    Established,
+    Received,
+    Reply,
+
+    // Errors
+    Refused,
+    Timeout,
+    Unknown,
+}
+impl Display for ConnectResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConnectResult::Established => write!(f, "established"),
+            ConnectResult::Received => write!(f, "received"),
+            ConnectResult::Reply => write!(f, "reply"),
+            ConnectResult::Refused => write!(f, "refused"),
+            ConnectResult::Timeout => write!(f, "timeout"),
+            ConnectResult::Unknown => write!(f, "unknown"),
+        }
+    }
+}
+
 #[derive(ValueEnum, Clone, Debug, Default)]
 pub enum ConnectMethod {
     #[default]
@@ -29,6 +53,7 @@ impl Display for ConnectMethod {
 
 #[derive(Debug)]
 pub struct OutputOptions {
+    pub echo: bool,
     pub quiet: bool,
     pub json: bool,
 }
@@ -36,6 +61,7 @@ pub struct OutputOptions {
 impl Default for OutputOptions {
     fn default() -> Self {
         Self {
+            echo: false,
             quiet: false,
             json: false,
         }
@@ -59,10 +85,22 @@ impl Default for PingOptions {
     }
 }
 
-#[derive(Clone, Default, Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HelloMessage {
+    pub uuid: String,
     pub ping: bool,
     pub pong: bool,
+}
+
+impl Default for HelloMessage {
+    fn default() -> Self {
+        let uuid = Uuid::new_v4();
+        Self {
+            uuid: uuid.to_string(),
+            ping: false,
+            pong: false,
+        }
+    }
 }
 
 #[derive(Clone, Default, Debug, Deserialize, Serialize)]

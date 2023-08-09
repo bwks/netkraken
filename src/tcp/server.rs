@@ -7,10 +7,9 @@ use tokio::net::TcpListener;
 // use tracing::event;
 // use tracing::Level;
 
-use crate::core::common::HelloMessage;
-use crate::core::common::{ConnectMethod, OutputOptions};
+use crate::core::common::{ConnectMethod, ConnectResult, HelloMessage, OutputOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT};
-use crate::util::message::server_conn_success_msg;
+use crate::util::message::{server_conn_success_msg, server_start_msg};
 use crate::util::parser::parse_ipaddr;
 
 pub struct TcpServer {
@@ -26,9 +25,7 @@ impl TcpServer {
 
         let listener = TcpListener::bind(&bind_addr).await?;
 
-        println!("TCP server listening on {}", &bind_addr);
-        println!("Press CRTL+C to exit");
-        println!("--------------------");
+        server_start_msg(ConnectMethod::TCP, &bind_addr);
 
         loop {
             let _json_output_flag = self.output_options.json;
@@ -36,11 +33,13 @@ impl TcpServer {
             let (mut stream, _) = listener.accept().await?;
 
             server_conn_success_msg(
+                ConnectResult::Received,
                 ConnectMethod::TCP,
                 &stream.peer_addr()?.to_string(),
                 &stream.local_addr()?.to_string(),
             );
 
+            let echo = self.output_options.echo;
             tokio::spawn(async move {
                 let mut buffer = Vec::with_capacity(64);
 
@@ -50,14 +49,16 @@ impl TcpServer {
                 let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
                 // Add echo handler
+                if echo && len > 0 {
+                    writer.write_all(data_string.as_bytes()).await?;
+                } else {
+                    // Discover NetKracken peer.
+                    let mut hello_msg: HelloMessage = serde_json::from_str(data_string)?;
+                    hello_msg.pong = true;
 
-                // Discover netkracken peer.
-                let mut hello_msg: HelloMessage = serde_json::from_str(data_string)?;
-                hello_msg.pong = true;
-
-                let json_message = serde_json::to_string(&hello_msg)?;
-                writer.write_all(json_message.as_bytes()).await?;
-
+                    let json_message = serde_json::to_string(&hello_msg)?;
+                    writer.write_all(json_message.as_bytes()).await?;
+                }
                 // Flush buffer
                 buffer.clear();
 

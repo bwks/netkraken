@@ -42,10 +42,6 @@ pub struct Cli {
     #[clap(short, long, default_value_t = 1000)]
     pub interval: u16,
 
-    /// Listen as a server
-    #[clap(short, long, default_value_t = false)]
-    pub listen: bool,
-
     /// JSON output (Only valid when using NetKraken client and server)
     #[clap(short, long, default_value_t = false)]
     pub json: bool,
@@ -55,8 +51,17 @@ pub struct Cli {
     pub quiet: bool,
 
     /// NetKraken peer discovery
-    #[clap(short, long, default_value_t = false)]
+    #[clap(short, long, default_value_t = true)]
     pub discover: bool,
+
+    // Server specific options
+    /// Listen as a server
+    #[clap(short, long, default_value_t = false)]
+    pub listen: bool,
+
+    /// Echo received data back to host without any processing
+    #[clap(short, long, default_value_t = false)]
+    pub echo: bool,
 }
 
 pub async fn init_cli() -> Result<()> {
@@ -69,6 +74,7 @@ pub async fn init_cli() -> Result<()> {
     ping_options.discover = cli.discover;
 
     let mut output_options = OutputOptions::default();
+    output_options.echo = cli.echo;
     output_options.json = cli.json;
     output_options.quiet = cli.quiet;
 
@@ -100,6 +106,7 @@ pub async fn init_cli() -> Result<()> {
                 let udp_server = UdpServer {
                     listen_addr: cli.dst_host,
                     listen_port: cli.dst_port,
+                    output_options,
                 };
                 udp_server.listen().await?;
             } else {
@@ -108,6 +115,8 @@ pub async fn init_cli() -> Result<()> {
                     cli.dst_port,
                     Some(cli.src_addr),
                     Some(cli.src_port),
+                    output_options,
+                    ping_options,
                 );
                 udp_client.connect().await?;
             }
