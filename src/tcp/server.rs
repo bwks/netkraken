@@ -1,5 +1,3 @@
-use std::sync::{Arc, Mutex};
-
 use anyhow::Result;
 
 use tokio::io::AsyncReadExt;
@@ -9,12 +7,11 @@ use tokio::net::TcpListener;
 // use tracing::event;
 // use tracing::Level;
 
-use crate::core::common::{ConnectMethod, ConnectResult, HelloMessage, OutputOptions};
+use crate::core::common::{ConnectMethod, ConnectResult, OutputOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT};
 use crate::util::message::{server_conn_success_msg, server_start_msg};
-use crate::util::parser::{hello_msg_reader, parse_ipaddr};
-
-type NkPeers = Arc<Mutex<Vec<String>>>;
+use crate::util::parser::{nk_msg_reader, parse_ipaddr};
+use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 
 pub struct TcpServer {
     pub listen_addr: String,
@@ -31,24 +28,16 @@ impl TcpServer {
 
         server_start_msg(ConnectMethod::TCP, &bind_addr);
 
-        let nk_peers = Arc::new(Mutex::new(Vec::new()));
-
         loop {
-            let nk_peers = nk_peers.clone();
-
             let _json_output_flag = self.output_options.json;
             // Receive stream
             let (mut stream, _) = listener.accept().await?;
 
-            server_conn_success_msg(
-                ConnectResult::Received,
-                ConnectMethod::TCP,
-                &stream.peer_addr()?.to_string(),
-                &stream.local_addr()?.to_string(),
-            );
-
             let echo = self.output_options.echo;
             tokio::spawn(async move {
+                let receive_time_utc = time_now_utc();
+                let receive_time_stamp = time_now_us()?;
+
                 let mut buffer = Vec::with_capacity(64);
 
                 let (mut reader, mut writer) = stream.split();
@@ -61,21 +50,30 @@ impl TcpServer {
                     writer.write_all(data_string.as_bytes()).await?;
                 } else {
                     // Discover NetKracken peer.
-                    if let Some(mut hello_msg) = hello_msg_reader(data_string) {
-                        hello_msg.pong = true;
+                    match nk_msg_reader(&data_string) {
+                        Some(mut m) => {
+                            let connection_time =
+                                calc_connect_ms(m.send_timestamp, receive_time_stamp);
 
-                        if let Ok(mut x) = nk_peers.lock() {
-                            x.push(hello_msg.uuid.to_string());
-                            println!("{:#?}", x);
-                        }
-                        if let Ok(x) = nk_peers.lock() {
-                            println!("{:#?}", x.contains(&hello_msg.uuid));
-                        }
+                            m.receive_time_utc = receive_time_utc;
+                            m.receive_timestamp = receive_time_stamp;
+                            m.client_server_time = connection_time;
 
-                        let json_message = serde_json::to_string(&hello_msg)?;
-                        writer.write_all(json_message.as_bytes()).await?;
-                    };
+                            // println!("{:#?}", m);
+
+                            let json_message = serde_json::to_string(&m)?;
+                            writer.write_all(json_message.as_bytes()).await?;
+                        }
+                        None => writer.write_all(data_string.as_bytes()).await?,
+                    }
                 }
+                server_conn_success_msg(
+                    ConnectResult::Received,
+                    ConnectMethod::TCP,
+                    &stream.peer_addr()?.to_string(),
+                    &stream.local_addr()?.to_string(),
+                );
+
                 // Flush buffer
                 buffer.clear();
 

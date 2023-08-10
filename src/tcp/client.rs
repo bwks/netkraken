@@ -11,8 +11,8 @@ use crate::core::common::{
 };
 use crate::core::konst::{BIND_ADDR, BIND_PORT};
 use crate::util::message::{client_conn_success_msg, client_err_msg, ping_header_msg};
-use crate::util::parser::{hello_msg_reader, parse_ipaddr};
-use crate::util::time::{calc_connect_ms, time_now_us};
+use crate::util::parser::{nk_msg_reader, parse_ipaddr};
+use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 
 #[derive(Debug)]
 pub struct TcpClient {
@@ -59,14 +59,16 @@ impl TcpClient {
         let connect_addr = SocketAddr::new(dst_addr, self.dst_port);
 
         let ping_interval = self.ping_options.interval;
-        let nk_peer_discovery = self.ping_options.discover;
 
         let uuid = Uuid::new_v4();
-        let mut is_nk_peer = false;
         let mut first_loop = true;
         let mut count: u16 = 0;
 
-        ping_header_msg(ConnectMethod::TCP, &connect_addr.to_string());
+        ping_header_msg(
+            &bind_addr.to_string(),
+            &connect_addr.to_string(),
+            ConnectMethod::TCP,
+        );
 
         loop {
             if count == u16::MAX {
@@ -100,59 +102,43 @@ impl TcpClient {
             let local_addr = &stream.local_addr()?.to_string();
             let peer_addr = &stream.peer_addr()?.to_string();
 
-            client_conn_success_msg(
-                ConnectResult::Reply,
-                ConnectMethod::TCP,
-                &peer_addr,
-                &local_addr,
-                connection_time,
-            );
-
             // Future file logging
             // event!(target: APP_NAME, Level::INFO, "{output} {latency}ms");
             // println!("{} rtt={}ms", output, connection_time);
 
             // Discover NetKraken peer.
-            // Only run on the first connection
-            if nk_peer_discovery && count == 1 {
-                // println!("warming up");
+            let nk_msg = NetKrakenMessage::new(
+                &uuid.to_string(),
+                &local_addr,
+                &peer_addr,
+                ConnectMethod::TCP,
+            )?;
 
-                let mut hello_msg = HelloMessage::default();
-                hello_msg.uuid = uuid.to_string();
-                hello_msg.ping = true;
+            let nk_hello = serde_json::to_string(&nk_msg)?;
+            let (mut reader, mut writer) = stream.split();
 
-                let json_hello = serde_json::to_string(&hello_msg)?;
-                let (mut reader, mut writer) = stream.split();
+            writer.write_all(nk_hello.as_bytes()).await?;
+            writer.shutdown().await?;
 
-                writer.write_all(json_hello.as_bytes()).await?;
-                writer.shutdown().await?;
+            let mut buffer: Vec<u8> = Vec::with_capacity(64);
+            let len = reader.read_to_end(&mut buffer).await?;
+            let data_string = &String::from_utf8_lossy(&buffer[..len]);
+            // println!("{}", data_string)
+            if let Some(mut m) = nk_msg_reader(&data_string) {
+                m.rount_trip_time_utc = time_now_utc();
+                m.rount_trip_timestamp = time_now_us()?;
+                m.rount_trip_time_ms = connection_time;
 
-                let mut buffer: Vec<u8> = Vec::with_capacity(64);
-                let len = reader.read_to_end(&mut buffer).await?;
-                let data_string = &String::from_utf8_lossy(&buffer[..len]);
-
-                let hello_msg = match hello_msg_reader(data_string) {
-                    Some(d) => d,
-                    None => continue,
-                };
-
-                if hello_msg.pong {
-                    is_nk_peer = true;
-                    println!("{:#?}", hello_msg)
-                }
+                // TODO: write to file
+                // println!("{:#?}", m)
             }
-
-            // TODO: NK <-> NK connection
-            if is_nk_peer {
-                // println!("nk peer: {is_nk_peer}");
-                let nk_msg = NetKrakenMessage::new(
-                    &uuid.to_string(),
-                    &local_addr,
-                    &peer_addr,
-                    ConnectMethod::TCP,
-                )?;
-                println!("{:#?}", nk_msg);
-            }
+            client_conn_success_msg(
+                ConnectResult::Reply,
+                ConnectMethod::TCP,
+                &local_addr,
+                &peer_addr,
+                connection_time,
+            );
         }
         Ok(())
     }

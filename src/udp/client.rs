@@ -62,7 +62,7 @@ impl UdpClient {
         let mut first_loop = true;
         let mut count = 0;
 
-        ping_header_msg(ConnectMethod::UDP, &dst_ip_port_str);
+        ping_header_msg(&bind_addr.to_string(), &dst_ip_port_str, ConnectMethod::UDP);
 
         loop {
             if count == u16::MAX {

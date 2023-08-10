@@ -18,11 +18,12 @@ pub fn server_start_msg(protocol: ConnectMethod, bind_addr: &String) {
 }
 
 /// Prints out a ping header message
-pub fn ping_header_msg(protocol: ConnectMethod, destination: &String) {
+pub fn ping_header_msg(source: &String, destination: &String, protocol: ConnectMethod) {
     println!(
-        "Connecting via {} to {}",
+        "Connecting from {} to {} via {}",
+        source,
+        destination,
         protocol.to_string().to_uppercase(),
-        destination
     );
 }
 
@@ -47,6 +48,7 @@ pub fn client_conn_success_msg(
     time: f64,
 ) {
     println!(
+        // "{} => proto={} src={} dst={} time={:.3}ms",
         "{} => proto={} src={} dst={} time={:.3}ms",
         result.to_string(),
         protocol.to_string().to_uppercase(),
