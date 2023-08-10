@@ -10,7 +10,8 @@ use tracing::Level;
 use crate::core::common::{ConnectMethod, ConnectResult, HelloMessage, OutputOptions};
 use crate::core::konst::{APP_NAME, BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::message::{server_conn_success_msg, server_start_msg};
-use crate::util::parser::{hello_msg_reader, parse_ipaddr};
+use crate::util::parser::{nk_msg_reader, parse_ipaddr};
+use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 
 pub struct UdpServer {
     pub listen_addr: String,
@@ -43,34 +44,42 @@ impl UdpServer {
             let (len, addr) = reader.recv_from(&mut buffer).await?;
             buffer.truncate(len);
 
+            let receive_time_utc = time_now_utc();
+            let receive_time_stamp = time_now_us()?;
+
             let local_addr = &reader.local_addr()?.to_string();
             let peer_addr = &addr.to_string();
 
-            server_conn_success_msg(
-                ConnectResult::Received,
-                ConnectMethod::UDP,
-                peer_addr,
-                local_addr,
-                1.0,
-            );
-
             // Add echo handler
-            if echo && len > 0 {
-                tx_chan.send((buffer.clone(), addr)).await?;
-            } else {
+            let mut client_server_time = 0.0;
+            if len > 0 {
                 let data_string = &String::from_utf8_lossy(&buffer);
 
-                // Discover NetKracken peer.
-                let mut hello_msg = match hello_msg_reader(data_string) {
-                    Some(d) => d,
-                    None => continue,
-                };
-                hello_msg.pong = true;
+                match nk_msg_reader(&data_string) {
+                    Some(mut m) => {
+                        let connection_time = calc_connect_ms(m.send_timestamp, receive_time_stamp);
+                        client_server_time = connection_time;
 
-                let json_message = serde_json::to_string(&hello_msg)?;
-                tx_chan
-                    .send((json_message.as_bytes().to_vec(), addr))
-                    .await?;
+                        m.receive_time_utc = receive_time_utc;
+                        m.receive_timestamp = receive_time_stamp;
+                        m.client_server_time = connection_time;
+
+                        // println!("{:#?}", m);
+
+                        let json_message = serde_json::to_string(&m)?;
+                        tx_chan
+                            .send((json_message.as_bytes().to_vec(), addr))
+                            .await?;
+                    }
+                    None => tx_chan.send((buffer.clone(), addr)).await?,
+                }
+                server_conn_success_msg(
+                    ConnectResult::Ping,
+                    ConnectMethod::UDP,
+                    peer_addr,
+                    local_addr,
+                    client_server_time,
+                );
             }
         }
     }

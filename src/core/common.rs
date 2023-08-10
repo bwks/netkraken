@@ -9,9 +9,8 @@ use crate::util::time::{time_now_us, time_now_utc};
 
 pub enum ConnectResult {
     // Success
-    Established,
-    Received,
-    Reply,
+    Ping,
+    Pong,
 
     // Errors
     Refused,
@@ -21,9 +20,8 @@ pub enum ConnectResult {
 impl Display for ConnectResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConnectResult::Established => write!(f, "established"),
-            ConnectResult::Received => write!(f, "received"),
-            ConnectResult::Reply => write!(f, "reply"),
+            ConnectResult::Ping => write!(f, "ping"),
+            ConnectResult::Pong => write!(f, "pong"),
             ConnectResult::Refused => write!(f, "refused"),
             ConnectResult::Timeout => write!(f, "timeout"),
             ConnectResult::Unknown => write!(f, "unknown"),

@@ -9,7 +9,7 @@ use uuid::Uuid;
 use crate::core::common::{
     ConnectMethod, ConnectResult, HelloMessage, NetKrakenMessage, OutputOptions, PingOptions,
 };
-use crate::core::konst::{BIND_ADDR, BIND_PORT};
+use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::message::{client_conn_success_msg, client_err_msg, ping_header_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
@@ -112,23 +112,28 @@ impl TcpClient {
 
             // Build a NetKrakenMessage to use as the payload
             // that is sent to the peer.
-            let nk_msg = NetKrakenMessage::new(
+            let mut nk_msg = NetKrakenMessage::new(
                 &uuid.to_string(),
                 &local_addr,
                 &peer_addr,
                 ConnectMethod::TCP,
             )?;
+            nk_msg.uuid = uuid.to_string();
 
-            let nk_msg_string = serde_json::to_string(&nk_msg)?;
+            let payload = serde_json::to_string(&nk_msg)?;
             let (mut reader, mut writer) = stream.split();
 
-            writer.write_all(nk_msg_string.as_bytes()).await?;
+            // Send payload to peer
+            writer.write_all(payload.as_bytes()).await?;
             writer.shutdown().await?;
 
-            let mut buffer: Vec<u8> = Vec::with_capacity(64);
+            // Wait for reply
+            let mut buffer = vec![0u8; MAX_PACKET_SIZE];
             let len = reader.read_to_end(&mut buffer).await?;
             let data_string = &String::from_utf8_lossy(&buffer[..len]);
             // println!("{}", data_string)
+
+            // Handle connection to a NetKraken peer
             if let Some(mut m) = nk_msg_reader(&data_string) {
                 m.rount_trip_time_utc = time_now_utc();
                 m.rount_trip_timestamp = time_now_us()?;
@@ -138,7 +143,7 @@ impl TcpClient {
                 // println!("{:#?}", m)
             }
             client_conn_success_msg(
-                ConnectResult::Reply,
+                ConnectResult::Pong,
                 ConnectMethod::TCP,
                 &local_addr,
                 &peer_addr,

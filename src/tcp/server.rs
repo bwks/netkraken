@@ -8,7 +8,7 @@ use tokio::net::TcpListener;
 // use tracing::Level;
 
 use crate::core::common::{ConnectMethod, ConnectResult, OutputOptions};
-use crate::core::konst::{BIND_ADDR, BIND_PORT};
+use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::message::{server_conn_success_msg, server_start_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
@@ -33,12 +33,11 @@ impl TcpServer {
             // Receive stream
             let (mut stream, _) = listener.accept().await?;
 
-            let echo = self.output_options.echo;
             tokio::spawn(async move {
                 let receive_time_utc = time_now_utc();
                 let receive_time_stamp = time_now_us()?;
 
-                let mut buffer = Vec::with_capacity(64);
+                let mut buffer = vec![0u8; MAX_PACKET_SIZE];
 
                 let (mut reader, mut writer) = stream.split();
 
@@ -67,7 +66,7 @@ impl TcpServer {
                     }
                 }
                 server_conn_success_msg(
-                    ConnectResult::Received,
+                    ConnectResult::Ping,
                     ConnectMethod::TCP,
                     &stream.peer_addr()?.to_string(),
                     &stream.local_addr()?.to_string(),
