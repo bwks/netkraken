@@ -51,6 +51,7 @@ impl UdpServer {
                 ConnectMethod::UDP,
                 peer_addr,
                 local_addr,
+                1.0,
             );
 
             // Add echo handler

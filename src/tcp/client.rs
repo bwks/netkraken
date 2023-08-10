@@ -71,12 +71,16 @@ impl TcpClient {
         );
 
         loop {
+            // Setting a hard limit on ping repeats to 65535
             if count == u16::MAX {
                 println!("max ping count reached");
                 break;
+            // All messages sent
             } else if self.ping_options.repeat != 0 && count >= self.ping_options.repeat {
                 break;
             } else {
+                // we don't want to sleep on the first loop, as this slows down
+                // the initial execution
                 match first_loop {
                     true => first_loop = false,
                     false => sleep(Duration::from_millis(ping_interval.into())).await,
@@ -106,7 +110,8 @@ impl TcpClient {
             // event!(target: APP_NAME, Level::INFO, "{output} {latency}ms");
             // println!("{} rtt={}ms", output, connection_time);
 
-            // Discover NetKraken peer.
+            // Build a NetKrakenMessage to use as the payload
+            // that is sent to the peer.
             let nk_msg = NetKrakenMessage::new(
                 &uuid.to_string(),
                 &local_addr,
@@ -114,10 +119,10 @@ impl TcpClient {
                 ConnectMethod::TCP,
             )?;
 
-            let nk_hello = serde_json::to_string(&nk_msg)?;
+            let nk_msg_string = serde_json::to_string(&nk_msg)?;
             let (mut reader, mut writer) = stream.split();
 
-            writer.write_all(nk_hello.as_bytes()).await?;
+            writer.write_all(nk_msg_string.as_bytes()).await?;
             writer.shutdown().await?;
 
             let mut buffer: Vec<u8> = Vec::with_capacity(64);
@@ -129,7 +134,7 @@ impl TcpClient {
                 m.rount_trip_timestamp = time_now_us()?;
                 m.rount_trip_time_ms = connection_time;
 
-                // TODO: write to file
+                // TODO: write nk message to file
                 // println!("{:#?}", m)
             }
             client_conn_success_msg(

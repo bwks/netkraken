@@ -64,12 +64,28 @@ pub fn server_conn_success_msg(
     protocol: ConnectMethod,
     source: &String,
     destination: &String,
+    time: f64,
 ) {
-    println!(
-        "{} => proto={} src={} dst={}",
-        result.to_string(),
-        protocol.to_string().to_uppercase(),
-        source,
-        destination,
-    )
+    let msg = match time == 0.0 {
+        true => {
+            format!(
+                "{} => proto={} src={} dst={}",
+                result.to_string(),
+                protocol.to_string().to_uppercase(),
+                source,
+                destination,
+            )
+        }
+        false => {
+            format!(
+                "{} => proto={} src={} dst={} time={:.3}",
+                result.to_string(),
+                protocol.to_string().to_uppercase(),
+                source,
+                destination,
+                time,
+            )
+        }
+    };
+    println!("{msg}")
 }

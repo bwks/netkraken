@@ -28,6 +28,8 @@ pub fn hello_msg_reader(s: &str) -> Option<HelloMessage> {
 }
 
 /// Attempt to read in a NetKrakenMessage from a string
+/// If the string be read into a NetKrakenMessage then
+/// it will be assumed that the peer is not a NetKraken host
 pub fn nk_msg_reader(s: &str) -> Option<NetKrakenMessage> {
     let data: NetKrakenMessage = match serde_json::from_str(s) {
         // If we can read this hello message we have a

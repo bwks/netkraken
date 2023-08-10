@@ -45,15 +45,14 @@ impl TcpServer {
                 let len = reader.read_to_end(&mut buffer).await?;
                 let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
-                // Add echo handler
-                if echo && len > 0 {
-                    writer.write_all(data_string.as_bytes()).await?;
-                } else {
+                let mut client_server_time = 0.0;
+                if len > 0 {
                     // Discover NetKracken peer.
                     match nk_msg_reader(&data_string) {
                         Some(mut m) => {
                             let connection_time =
                                 calc_connect_ms(m.send_timestamp, receive_time_stamp);
+                            client_server_time = connection_time;
 
                             m.receive_time_utc = receive_time_utc;
                             m.receive_timestamp = receive_time_stamp;
@@ -72,6 +71,7 @@ impl TcpServer {
                     ConnectMethod::TCP,
                     &stream.peer_addr()?.to_string(),
                     &stream.local_addr()?.to_string(),
+                    client_server_time,
                 );
 
                 // Flush buffer
