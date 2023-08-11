@@ -135,9 +135,9 @@ impl TcpClient {
 
             // Handle connection to a NetKraken peer
             if let Some(mut m) = nk_msg_reader(&data_string) {
-                m.rount_trip_time_utc = time_now_utc();
-                m.rount_trip_timestamp = time_now_us()?;
-                m.rount_trip_time_ms = connection_time;
+                m.round_trip_time_utc = time_now_utc();
+                m.round_trip_timestamp = time_now_us()?;
+                m.round_trip_time_ms = connection_time;
 
                 // TODO: write nk message to file
                 // println!("{:#?}", m)

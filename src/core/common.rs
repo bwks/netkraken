@@ -51,7 +51,6 @@ impl Display for ConnectMethod {
 
 #[derive(Debug)]
 pub struct OutputOptions {
-    pub echo: bool,
     pub quiet: bool,
     pub json: bool,
 }
@@ -59,7 +58,6 @@ pub struct OutputOptions {
 impl Default for OutputOptions {
     fn default() -> Self {
         Self {
-            echo: false,
             quiet: false,
             json: false,
         }
@@ -70,6 +68,7 @@ impl Default for OutputOptions {
 pub struct PingOptions {
     pub repeat: u16,
     pub interval: u16,
+    pub timeout: u16,
     pub discover: bool,
 }
 
@@ -78,6 +77,7 @@ impl Default for PingOptions {
         Self {
             repeat: 4,
             interval: 1000,
+            timeout: 1000,
             discover: false,
         }
     }
@@ -109,9 +109,9 @@ pub struct NetKrakenMessage {
     pub receive_time_utc: String,
     pub receive_timestamp: u128,
     pub client_server_time: f64,
-    pub rount_trip_time_utc: String,
-    pub rount_trip_timestamp: u128,
-    pub rount_trip_time_ms: f64,
+    pub round_trip_time_utc: String,
+    pub round_trip_timestamp: u128,
+    pub round_trip_time_ms: f64,
     pub source: String,
     pub destination: String,
     pub protocol: String,

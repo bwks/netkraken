@@ -42,6 +42,10 @@ pub struct Cli {
     #[clap(short, long, default_value_t = 1000)]
     pub interval: u16,
 
+    /// Timeout between pings (in milliseconds)
+    #[clap(short, long, default_value_t = 1000)]
+    pub timeout: u16,
+
     /// JSON output (Only valid when using NetKraken client and server)
     #[clap(short, long, default_value_t = false)]
     pub json: bool,
@@ -50,18 +54,10 @@ pub struct Cli {
     #[clap(short, long, default_value_t = false)]
     pub quiet: bool,
 
-    /// NetKraken peer discovery
-    #[clap(short, long, default_value_t = true)]
-    pub discover: bool,
-
     // Server specific options
     /// Listen as a server
     #[clap(short, long, default_value_t = false)]
     pub listen: bool,
-
-    /// Echo received data back to host without any processing
-    #[clap(short, long, default_value_t = false)]
-    pub echo: bool,
 }
 
 pub async fn init_cli() -> Result<()> {
@@ -71,10 +67,9 @@ pub async fn init_cli() -> Result<()> {
     let mut ping_options = PingOptions::default();
     ping_options.repeat = cli.repeat;
     ping_options.interval = cli.interval;
-    ping_options.discover = cli.discover;
+    ping_options.timeout = cli.timeout;
 
     let mut output_options = OutputOptions::default();
-    output_options.echo = cli.echo;
     output_options.json = cli.json;
     output_options.quiet = cli.quiet;
 

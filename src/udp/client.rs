@@ -1,4 +1,5 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::net::{IpAddr, SocketAddr};
+use std::sync::Arc;
 
 use anyhow::Result;
 
@@ -10,8 +11,8 @@ use crate::core::common::{ConnectMethod, ConnectResult, NetKrakenMessage};
 use crate::core::common::{OutputOptions, PingOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::message::{client_conn_success_msg, client_err_msg, ping_header_msg};
-use crate::util::parser::{hello_msg_reader, parse_ipaddr};
-use crate::util::time::{calc_connect_ms, time_now_us};
+use crate::util::parser::{nk_msg_reader, parse_ipaddr};
+use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 
 pub struct UdpClient {
     pub dst_addr: String,
@@ -51,30 +52,29 @@ impl UdpClient {
 
     pub async fn connect(&self) -> Result<()> {
         let src_addr = parse_ipaddr(&self.src_addr)?;
-        let dst_ip_port_str = format!("{}:{}", self.dst_addr, self.dst_port);
+        let dst_addr = parse_ipaddr(&self.dst_addr)?;
 
         let bind_addr = SocketAddr::new(src_addr, self.src_port);
+        let peer_addr = SocketAddr::new(dst_addr, self.dst_port);
 
         let ping_interval = self.ping_options.interval;
+        let ping_timeout = self.ping_options.timeout;
 
         let uuid = Uuid::new_v4();
         let mut first_loop = true;
         let mut count = 0;
 
-        ping_header_msg(&bind_addr.to_string(), &dst_ip_port_str, ConnectMethod::UDP);
+        ping_header_msg(
+            &bind_addr.to_string(),
+            &peer_addr.to_string(),
+            ConnectMethod::UDP,
+        );
 
         loop {
-            if count == u16::MAX {
-                println!("max ping count reached");
-                break;
-            } else if self.ping_options.repeat != 0 && count >= self.ping_options.repeat {
-                break;
-            } else {
-                match first_loop {
-                    true => first_loop = false,
-                    false => sleep(Duration::from_millis(ping_interval.into())).await,
-                }
-                count += 1;
+            match loop_handler(count, self.ping_options.repeat, self.ping_options.interval).await {
+                true => break,
+
+                false => count += 1,
             }
 
             let socket = UdpSocket::bind(bind_addr).await?;
@@ -85,8 +85,8 @@ impl UdpClient {
             let mut nk_msg = NetKrakenMessage::new(
                 &uuid.to_string(),
                 &reader.local_addr()?.to_string(),
-                &dst_ip_port_str,
-                ConnectMethod::TCP,
+                &peer_addr.to_string(),
+                ConnectMethod::UDP,
             )?;
             nk_msg.uuid = uuid.to_string();
 
@@ -95,14 +95,14 @@ impl UdpClient {
             // record timestamp before connection
             let pre_conn_timestamp = time_now_us()?;
 
-            writer.connect(dst_ip_port_str.to_owned()).await?;
+            writer.connect(peer_addr).await?;
             writer.send(payload.as_bytes()).await?;
 
             // Wait for a reply
-            let my_duration = tokio::time::Duration::from_millis(ping_interval.into());
+            let tick = Duration::from_millis(ping_timeout.into());
             let mut buffer = vec![0u8; MAX_PACKET_SIZE];
 
-            match timeout(my_duration, reader.recv_from(&mut buffer)).await {
+            match timeout(tick, reader.recv_from(&mut buffer)).await {
                 Ok(result) => {
                     if let Ok((len, addr)) = result {
                         // Record timestamp after connection
@@ -124,11 +124,35 @@ impl UdpClient {
                         );
 
                         let data_string = &String::from_utf8_lossy(&buffer[..len]);
+
+                        // Handle connection to a NetKraken peer
+                        if let Some(mut m) = nk_msg_reader(&data_string) {
+                            m.round_trip_time_utc = time_now_utc();
+                            m.round_trip_timestamp = time_now_us()?;
+                            m.round_trip_time_ms = connection_time;
+
+                            // TODO: write nk message to file
+                            println!("{:#?}", m)
+                        }
                     }
                 }
                 Err(e) => client_err_msg(ConnectResult::Timeout, e.into()),
             }
         }
         Ok(())
+    }
+}
+
+async fn loop_handler(count: u16, repeat: u16, sleep_interval: u16) -> bool {
+    if count == u16::MAX {
+        println!("max ping count reached");
+        return true;
+    } else if repeat != 0 && count >= repeat {
+        return true;
+    } else {
+        if count > 0 {
+            sleep(Duration::from_millis(sleep_interval.into())).await;
+        }
+        return false;
     }
 }

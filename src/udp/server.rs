@@ -22,7 +22,6 @@ pub struct UdpServer {
 impl UdpServer {
     pub async fn listen(&self) -> Result<()> {
         let listen_addr = parse_ipaddr(&self.listen_addr)?;
-        let echo = self.output_options.echo;
 
         let bind_addr = format!("{}:{}", listen_addr, self.listen_port);
         let socket = UdpSocket::bind(&bind_addr).await?;
