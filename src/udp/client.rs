@@ -1,4 +1,4 @@
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::Result;
