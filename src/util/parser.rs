@@ -2,7 +2,7 @@ use std::net::IpAddr;
 
 use anyhow::{bail, Result};
 
-use crate::core::common::{HelloMessage, NetKrakenMessage};
+use crate::core::common::NetKrakenMessage;
 
 pub fn parse_ipaddr(s: &String) -> Result<IpAddr> {
     if !s.contains(".") && !s.contains(":") {

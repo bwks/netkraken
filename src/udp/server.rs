@@ -7,7 +7,7 @@ use tokio::sync::mpsc;
 use tracing::event;
 use tracing::Level;
 
-use crate::core::common::{ConnectMethod, ConnectResult, HelloMessage, OutputOptions};
+use crate::core::common::{ConnectMethod, ConnectResult, OutputOptions};
 use crate::core::konst::{APP_NAME, BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::message::{server_conn_success_msg, server_start_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};

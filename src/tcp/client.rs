@@ -7,7 +7,7 @@ use tokio::time::{sleep, Duration};
 use uuid::Uuid;
 
 use crate::core::common::{
-    ConnectMethod, ConnectResult, HelloMessage, NetKrakenMessage, OutputOptions, PingOptions,
+    ConnectMethod, ConnectResult, NetKrakenMessage, OutputOptions, PingOptions,
 };
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::message::{client_conn_success_msg, client_err_msg, ping_header_msg};

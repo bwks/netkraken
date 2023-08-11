@@ -3,7 +3,6 @@ use std::fmt::Display;
 use anyhow::Result;
 use clap::ValueEnum;
 use serde_derive::{Deserialize, Serialize};
-use uuid::Uuid;
 
 use crate::util::time::{time_now_us, time_now_utc};
 
@@ -69,7 +68,6 @@ pub struct PingOptions {
     pub repeat: u16,
     pub interval: u16,
     pub timeout: u16,
-    pub discover: bool,
 }
 
 impl Default for PingOptions {
@@ -78,25 +76,6 @@ impl Default for PingOptions {
             repeat: 4,
             interval: 1000,
             timeout: 1000,
-            discover: false,
-        }
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct HelloMessage {
-    pub uuid: String,
-    pub ping: bool,
-    pub pong: bool,
-}
-
-impl Default for HelloMessage {
-    fn default() -> Self {
-        let uuid = Uuid::new_v4();
-        Self {
-            uuid: uuid.to_string(),
-            ping: false,
-            pong: false,
         }
     }
 }

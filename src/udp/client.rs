@@ -57,11 +57,7 @@ impl UdpClient {
         let bind_addr = SocketAddr::new(src_addr, self.src_port);
         let peer_addr = SocketAddr::new(dst_addr, self.dst_port);
 
-        let ping_interval = self.ping_options.interval;
-        let ping_timeout = self.ping_options.timeout;
-
         let uuid = Uuid::new_v4();
-        let mut first_loop = true;
         let mut count = 0;
 
         ping_header_msg(
@@ -81,10 +77,11 @@ impl UdpClient {
 
             let reader = Arc::new(socket);
             let writer = reader.clone();
+            writer.connect(peer_addr).await?;
 
             let mut nk_msg = NetKrakenMessage::new(
                 &uuid.to_string(),
-                &reader.local_addr()?.to_string(),
+                &writer.local_addr()?.to_string(),
                 &peer_addr.to_string(),
                 ConnectMethod::UDP,
             )?;
@@ -95,11 +92,10 @@ impl UdpClient {
             // record timestamp before connection
             let pre_conn_timestamp = time_now_us()?;
 
-            writer.connect(peer_addr).await?;
             writer.send(payload.as_bytes()).await?;
 
             // Wait for a reply
-            let tick = Duration::from_millis(ping_timeout.into());
+            let tick = Duration::from_millis(self.ping_options.timeout.into());
             let mut buffer = vec![0u8; MAX_PACKET_SIZE];
 
             match timeout(tick, reader.recv_from(&mut buffer)).await {
@@ -132,7 +128,7 @@ impl UdpClient {
                             m.round_trip_time_ms = connection_time;
 
                             // TODO: write nk message to file
-                            println!("{:#?}", m)
+                            // println!("{:#?}", m)
                         }
                     }
                 }
