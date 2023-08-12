@@ -61,8 +61,7 @@ impl UdpServer {
                         m.receive_time_utc = receive_time_utc;
                         m.receive_timestamp = receive_time_stamp;
                         m.client_server_time = connection_time;
-
-                        // println!("{:#?}", m);
+                        m.nk_peer = true;
 
                         let json_message = serde_json::to_string(&m)?;
                         tx_chan
@@ -71,13 +70,22 @@ impl UdpServer {
                     }
                     None => tx_chan.send((buffer.clone(), addr)).await?,
                 }
-                server_conn_success_msg(
+                let msg = server_conn_success_msg(
                     ConnectResult::Ping,
                     ConnectMethod::UDP,
                     peer_addr,
                     local_addr,
                     client_server_time,
                 );
+                if !self.output_options.quiet {
+                    println!("{msg}");
+                }
+                if self.output_options.syslog {
+                    event!(target: APP_NAME, Level::INFO, "{msg}");
+                }
+                if self.output_options.json {
+                    // json output file
+                }
             }
         }
     }

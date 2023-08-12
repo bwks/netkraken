@@ -2,3 +2,5 @@
 
 # editors
 .vscode/
+
+*.log

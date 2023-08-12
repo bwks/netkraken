@@ -52,6 +52,7 @@ impl Display for ConnectMethod {
 pub struct OutputOptions {
     pub quiet: bool,
     pub json: bool,
+    pub syslog: bool,
 }
 
 impl Default for OutputOptions {
@@ -59,6 +60,7 @@ impl Default for OutputOptions {
         Self {
             quiet: false,
             json: false,
+            syslog: false,
         }
     }
 }
@@ -94,7 +96,7 @@ pub struct NetKrakenMessage {
     pub source: String,
     pub destination: String,
     pub protocol: String,
-    pub malformed: bool,
+    pub nk_peer: bool,
 }
 
 impl NetKrakenMessage {

@@ -46,16 +46,16 @@ pub fn client_conn_success_msg(
     source: &String,
     destination: &String,
     time: f64,
-) {
-    println!(
-        // "{} => proto={} src={} dst={} time={:.3}ms",
+) -> String {
+    let msg = format!(
         "{} => proto={} src={} dst={} time={:.3}ms",
         result.to_string(),
         protocol.to_string().to_uppercase(),
         source,
         destination,
         time,
-    )
+    );
+    msg
 }
 
 /// Prints out a server connection success message
@@ -65,7 +65,7 @@ pub fn server_conn_success_msg(
     source: &String,
     destination: &String,
     time: f64,
-) {
+) -> String {
     let msg = match time == 0.0 {
         true => {
             format!(
@@ -87,5 +87,5 @@ pub fn server_conn_success_msg(
             )
         }
     };
-    println!("{msg}")
+    msg
 }

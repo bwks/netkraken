@@ -2,14 +2,15 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use anyhow::Result;
-
 use tokio::net::UdpSocket;
 use tokio::time::{sleep, timeout, Duration};
+use tracing::event;
+use tracing::Level;
 use uuid::Uuid;
 
 use crate::core::common::{ConnectMethod, ConnectResult, NetKrakenMessage};
 use crate::core::common::{OutputOptions, PingOptions};
-use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
+use crate::core::konst::{APP_NAME, BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::message::{client_conn_success_msg, client_err_msg, ping_header_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
@@ -69,7 +70,6 @@ impl UdpClient {
         loop {
             match loop_handler(count, self.ping_options.repeat, self.ping_options.interval).await {
                 true => break,
-
                 false => count += 1,
             }
 
@@ -111,7 +111,7 @@ impl UdpClient {
                         let local_addr = &writer.local_addr()?.to_string();
                         let peer_addr = &addr.to_string();
 
-                        client_conn_success_msg(
+                        let msg = client_conn_success_msg(
                             ConnectResult::Pong,
                             ConnectMethod::UDP,
                             &local_addr,
@@ -127,8 +127,16 @@ impl UdpClient {
                             m.round_trip_timestamp = time_now_us()?;
                             m.round_trip_time_ms = connection_time;
 
-                            // TODO: write nk message to file
-                            // println!("{:#?}", m)
+                            if self.output_options.json {
+                                // json output file
+                                println!("{}", serde_json::to_string(&m)?);
+                            }
+                        }
+                        if !self.output_options.quiet {
+                            println!("{msg}");
+                        }
+                        if self.output_options.syslog {
+                            event!(target: APP_NAME, Level::INFO, "{msg}");
                         }
                     }
                 }
