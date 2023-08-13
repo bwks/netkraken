@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 
 use anyhow::Result;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpSocket, TcpStream};
+use tokio::net::TcpSocket;
 use tokio::time::{timeout, Duration};
 use tracing::event;
 use tracing::Level;
@@ -77,15 +77,25 @@ impl TcpClient {
             }
 
             let src_socket = get_tcp_socket(bind_addr).await?;
+            let local_addr = src_socket.local_addr()?.to_string();
 
             // record timestamp before connection
             let pre_conn_timestamp = time_now_us()?;
 
             let tick = Duration::from_millis(self.ping_options.timeout.into());
-            let mut stream = match timeout(tick, tcp_connect(src_socket, connect_addr)).await {
+            let mut stream = match timeout(tick, src_socket.connect(connect_addr)).await {
                 Ok(s) => match s {
-                    Some(s) => s,
-                    None => continue,
+                    Ok(s) => s,
+                    Err(e) => {
+                        let msg = handle_connect_error(e, local_addr, connect_addr.to_string());
+                        if !self.output_options.quiet {
+                            println!("{msg}");
+                        }
+                        if self.output_options.syslog {
+                            event!(target: APP_NAME, Level::ERROR, "{msg}");
+                        }
+                        continue;
+                    }
                 },
                 Err(e) => {
                     let msg = client_err_msg(
@@ -124,46 +134,42 @@ impl TcpClient {
             writer.shutdown().await?;
 
             // Wait for reply
-            // let tick = Duration::from_millis(self.ping_options.timeout.into());
             let mut buffer = vec![0u8; MAX_PACKET_SIZE];
 
             match reader.read_to_end(&mut buffer).await {
                 Ok(len) => {
+                    // Record timestamp after connection
+                    let post_conn_timestamp = time_now_us()?;
+
+                    // Calculate the round trip time
+                    let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
+
+                    let local_addr = &writer.local_addr()?.to_string();
+                    let peer_addr = &reader.peer_addr()?.to_string();
+
                     if len > 0 {
-                        // Record timestamp after connection
-                        let post_conn_timestamp = time_now_us()?;
+                        let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
-                        // Calculate the round trip time
-                        let connection_time =
-                            calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
-
-                        let local_addr = &writer.local_addr()?.to_string();
-                        let peer_addr = &reader.peer_addr()?.to_string();
-
-                        if len > 0 {
-                            let data_string = &String::from_utf8_lossy(&buffer[..len]);
-
-                            if let Some(mut m) = nk_msg_reader(&data_string) {
-                                m.round_trip_time_utc = time_now_utc();
-                                m.round_trip_timestamp = time_now_us()?;
-                                m.round_trip_time_ms = connection_time;
-                            }
-                            let msg = client_conn_success_msg(
-                                ConnectResult::Pong,
-                                ConnectMethod::TCP,
-                                &local_addr,
-                                &peer_addr,
-                                connection_time,
-                            );
-                            if !self.output_options.quiet {
-                                println!("{msg}");
-                            }
-                            if self.output_options.syslog {
-                                event!(target: APP_NAME, Level::INFO, "{msg}");
-                            }
-                            if self.output_options.json {
-                                // handle json output
-                            }
+                        if let Some(mut m) = nk_msg_reader(&data_string) {
+                            m.round_trip_time_utc = time_now_utc();
+                            m.round_trip_timestamp = time_now_us()?;
+                            m.round_trip_time_ms = connection_time;
+                        }
+                        let msg = client_conn_success_msg(
+                            ConnectResult::Pong,
+                            ConnectMethod::TCP,
+                            &local_addr,
+                            &peer_addr,
+                            connection_time,
+                        );
+                        if !self.output_options.quiet {
+                            println!("{msg}");
+                        }
+                        if self.output_options.syslog {
+                            event!(target: APP_NAME, Level::INFO, "{msg}");
+                        }
+                        if self.output_options.json {
+                            // handle json output
                         }
                     }
                 }
@@ -188,43 +194,13 @@ impl TcpClient {
     }
 }
 
-fn handle_connect_error(error: std::io::Error, source: String, destination: String) -> String {
-    match error.kind() {
-        std::io::ErrorKind::ConnectionRefused => client_err_msg(
-            ConnectResult::Refused,
-            ConnectMethod::TCP,
-            &source,
-            &destination,
-            error,
-        ),
-        std::io::ErrorKind::TimedOut => client_err_msg(
-            ConnectResult::Timeout,
-            ConnectMethod::TCP,
-            &source,
-            &destination,
-            error,
-        ),
-        _ => client_err_msg(
-            ConnectResult::Unknown,
-            ConnectMethod::TCP,
-            &source,
-            &destination,
-            error,
-        ),
-    }
-}
-
-async fn tcp_connect(src_socket: TcpSocket, connect_addr: SocketAddr) -> Option<TcpStream> {
-    let source = src_socket.local_addr().unwrap().to_string();
-    let stream = match src_socket.connect(connect_addr).await {
-        Ok(s) => s,
-        Err(e) => {
-            let msg = handle_connect_error(e, source, connect_addr.to_string());
-            println!("{}", msg);
-            return None;
-        }
+pub fn handle_connect_error(error: std::io::Error, source: String, destination: String) -> String {
+    let err = match error.kind() {
+        std::io::ErrorKind::ConnectionRefused => ConnectResult::Refused,
+        std::io::ErrorKind::TimedOut => ConnectResult::Timeout,
+        _ => ConnectResult::Unknown,
     };
-    Some(stream)
+    client_err_msg(err, ConnectMethod::TCP, &source, &destination, error)
 }
 
 async fn get_tcp_socket(bind_addr: SocketAddr) -> Result<TcpSocket> {
