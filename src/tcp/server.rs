@@ -3,12 +3,11 @@ use anyhow::Result;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
-
-// use tracing::event;
-// use tracing::Level;
+use tracing::event;
+use tracing::Level;
 
 use crate::core::common::{ConnectMethod, ConnectResult, OutputOptions};
-use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
+use crate::core::konst::{APP_NAME, BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::message::{server_conn_success_msg, server_start_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
@@ -29,7 +28,9 @@ impl TcpServer {
         server_start_msg(ConnectMethod::TCP, &bind_addr);
 
         loop {
-            let _json_output_flag = self.output_options.json;
+            let quiet_output = self.output_options.quiet;
+            let syslog_output = self.output_options.syslog;
+            let json_output = self.output_options.json;
             // Receive stream
             let (mut stream, _) = listener.accept().await?;
 
@@ -55,7 +56,7 @@ impl TcpServer {
 
                             m.receive_time_utc = receive_time_utc;
                             m.receive_timestamp = receive_time_stamp;
-                            m.client_server_time = connection_time;
+                            m.one_way_time_ms = connection_time;
 
                             // println!("{:#?}", m);
 
@@ -65,13 +66,22 @@ impl TcpServer {
                         None => writer.write_all(data_string.as_bytes()).await?,
                     }
                 }
-                server_conn_success_msg(
+                let msg = server_conn_success_msg(
                     ConnectResult::Ping,
                     ConnectMethod::TCP,
                     &stream.peer_addr()?.to_string(),
                     &stream.local_addr()?.to_string(),
                     client_server_time,
                 );
+                if !quiet_output {
+                    println!("{msg}");
+                }
+                if syslog_output {
+                    event!(target: APP_NAME, Level::INFO, "{msg}");
+                }
+                if json_output {
+                    // json output file
+                }
 
                 // Flush buffer
                 buffer.clear();

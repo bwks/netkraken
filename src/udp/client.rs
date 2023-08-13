@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use tokio::net::UdpSocket;
-use tokio::time::{sleep, timeout, Duration};
+use tokio::time::{timeout, Duration};
 use tracing::event;
 use tracing::Level;
 use uuid::Uuid;
@@ -11,6 +11,7 @@ use uuid::Uuid;
 use crate::core::common::{ConnectMethod, ConnectResult, NetKrakenMessage};
 use crate::core::common::{OutputOptions, PingOptions};
 use crate::core::konst::{APP_NAME, BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
+use crate::util::handler::loop_handler;
 use crate::util::message::{client_conn_success_msg, client_err_msg, ping_header_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
@@ -119,19 +120,22 @@ impl UdpClient {
                             connection_time,
                         );
 
-                        let data_string = &String::from_utf8_lossy(&buffer[..len]);
+                        if len > 0 {
+                            let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
-                        // Handle connection to a NetKraken peer
-                        if let Some(mut m) = nk_msg_reader(&data_string) {
-                            m.round_trip_time_utc = time_now_utc();
-                            m.round_trip_timestamp = time_now_us()?;
-                            m.round_trip_time_ms = connection_time;
+                            // Handle connection to a NetKraken peer
+                            if let Some(mut m) = nk_msg_reader(&data_string) {
+                                m.round_trip_time_utc = time_now_utc();
+                                m.round_trip_timestamp = time_now_us()?;
+                                m.round_trip_time_ms = connection_time;
 
-                            if self.output_options.json {
-                                // json output file
-                                println!("{}", serde_json::to_string(&m)?);
+                                if self.output_options.json {
+                                    // json output file
+                                    println!("{}", serde_json::to_string(&m)?);
+                                }
                             }
                         }
+
                         if !self.output_options.quiet {
                             println!("{msg}");
                         }
@@ -140,23 +144,23 @@ impl UdpClient {
                         }
                     }
                 }
-                Err(e) => client_err_msg(ConnectResult::Timeout, e.into()),
+                Err(e) => {
+                    let msg = client_err_msg(
+                        ConnectResult::Timeout,
+                        ConnectMethod::UDP,
+                        &writer.local_addr()?.to_string(),
+                        &peer_addr.to_string(),
+                        e.into(),
+                    );
+                    if !self.output_options.quiet {
+                        println!("{msg}");
+                    }
+                    if self.output_options.syslog {
+                        event!(target: APP_NAME, Level::ERROR, "{msg}");
+                    }
+                }
             }
         }
         Ok(())
-    }
-}
-
-async fn loop_handler(count: u16, repeat: u16, sleep_interval: u16) -> bool {
-    if count == u16::MAX {
-        println!("max ping count reached");
-        return true;
-    } else if repeat != 0 && count >= repeat {
-        return true;
-    } else {
-        if count > 0 {
-            sleep(Duration::from_millis(sleep_interval.into())).await;
-        }
-        return false;
     }
 }

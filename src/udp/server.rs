@@ -50,6 +50,7 @@ impl UdpServer {
 
             // Add echo handler
             let mut client_server_time = 0.0;
+
             if len > 0 {
                 let data_string = &String::from_utf8_lossy(&buffer);
 
@@ -60,7 +61,7 @@ impl UdpServer {
 
                         m.receive_time_utc = receive_time_utc;
                         m.receive_timestamp = receive_time_stamp;
-                        m.client_server_time = connection_time;
+                        m.one_way_time_ms = connection_time;
                         m.nk_peer = true;
 
                         let json_message = serde_json::to_string(&m)?;
@@ -86,6 +87,8 @@ impl UdpServer {
                 if self.output_options.json {
                     // json output file
                 }
+            } else {
+                tx_chan.send((buffer.clone(), addr)).await?
             }
         }
     }

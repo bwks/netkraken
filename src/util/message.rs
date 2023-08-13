@@ -28,15 +28,24 @@ pub fn ping_header_msg(source: &String, destination: &String, protocol: ConnectM
 }
 
 /// Prints out an error message
-pub fn client_err_msg(result: ConnectResult, error: std::io::Error) {
-    match result {
-        ConnectResult::Unknown => {
-            println!("error => {}", error)
-        }
-        _ => {
-            println!("error => {}", result.to_string())
-        }
-    }
+pub fn client_err_msg(
+    result: ConnectResult,
+    protocol: ConnectMethod,
+    source: &String,
+    destination: &String,
+    error: std::io::Error,
+) -> String {
+    let err = match result {
+        ConnectResult::Unknown => error.to_string(),
+        _ => result.to_string(),
+    };
+    format!(
+        "{} => proto={} src={} dst={}",
+        err,
+        protocol.to_string().to_uppercase(),
+        source,
+        destination,
+    )
 }
 
 /// Prints out a client connection success message
@@ -78,7 +87,7 @@ pub fn server_conn_success_msg(
         }
         false => {
             format!(
-                "{} => proto={} src={} dst={} time={:.3}",
+                "{} => proto={} src={} dst={} time={:.3}ms",
                 result.to_string(),
                 protocol.to_string().to_uppercase(),
                 source,

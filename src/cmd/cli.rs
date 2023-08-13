@@ -52,7 +52,7 @@ pub struct Cli {
     pub src_port: u16,
 
     /// Timeout between pings (in milliseconds)
-    #[clap(short, long, default_value_t = 1000)]
+    #[clap(short, long, default_value_t = 3000)]
     pub timeout: u16,
 
     // Output options
