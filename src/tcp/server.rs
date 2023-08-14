@@ -3,11 +3,10 @@ use anyhow::Result;
 use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
-use tracing::event;
-use tracing::Level;
 
-use crate::core::common::{ConnectMethod, ConnectResult, OutputOptions};
-use crate::core::konst::{APP_NAME, BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
+use crate::core::common::{ConnectMethod, ConnectResult, LogLevel, OutputOptions};
+use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
+use crate::util::handler::output_handler;
 use crate::util::message::{server_conn_success_msg, server_start_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
@@ -41,13 +40,12 @@ impl TcpServer {
                 let mut buffer = vec![0u8; MAX_PACKET_SIZE];
 
                 let (mut reader, mut writer) = stream.split();
-
-                let len = reader.read_to_end(&mut buffer).await?;
-                let data_string = &String::from_utf8_lossy(&buffer[..len]);
-
+                let len = reader.read(&mut buffer).await?;
+                buffer.truncate(len);
                 let mut client_server_time = 0.0;
                 if len > 0 {
                     // Discover NetKracken peer.
+                    let data_string = &String::from_utf8_lossy(&buffer);
                     match nk_msg_reader(&data_string) {
                         Some(mut m) => {
                             let connection_time =
@@ -57,8 +55,6 @@ impl TcpServer {
                             m.receive_time_utc = receive_time_utc;
                             m.receive_timestamp = receive_time_stamp;
                             m.one_way_time_ms = connection_time;
-
-                            // println!("{:#?}", m);
 
                             let json_message = serde_json::to_string(&m)?;
                             writer.write_all(json_message.as_bytes()).await?;
@@ -73,15 +69,14 @@ impl TcpServer {
                     &stream.local_addr()?.to_string(),
                     client_server_time,
                 );
-                if !quiet_output {
-                    println!("{msg}");
-                }
-                if syslog_output {
-                    event!(target: APP_NAME, Level::INFO, "{msg}");
-                }
-                if json_output {
-                    // json output file
-                }
+                output_handler(
+                    LogLevel::INFO,
+                    &msg,
+                    quiet_output,
+                    syslog_output,
+                    json_output,
+                )
+                .await;
 
                 // Flush buffer
                 buffer.clear();

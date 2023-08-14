@@ -4,15 +4,13 @@ use anyhow::Result;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpSocket;
 use tokio::time::{timeout, Duration};
-use tracing::event;
-use tracing::Level;
 use uuid::Uuid;
 
 use crate::core::common::{
-    ConnectMethod, ConnectResult, NetKrakenMessage, OutputOptions, PingOptions,
+    ConnectMethod, ConnectResult, LogLevel, NetKrakenMessage, OutputOptions, PingOptions,
 };
-use crate::core::konst::{APP_NAME, BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
-use crate::util::handler::loop_handler;
+use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
+use crate::util::handler::{loop_handler, output_handler};
 use crate::util::message::{client_conn_success_msg, client_err_msg, ping_header_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
@@ -88,12 +86,16 @@ impl TcpClient {
                     Ok(s) => s,
                     Err(e) => {
                         let msg = handle_connect_error(e, local_addr, connect_addr.to_string());
-                        if !self.output_options.quiet {
-                            println!("{msg}");
-                        }
-                        if self.output_options.syslog {
-                            event!(target: APP_NAME, Level::ERROR, "{msg}");
-                        }
+
+                        output_handler(
+                            LogLevel::ERROR,
+                            &msg,
+                            self.output_options.quiet,
+                            self.output_options.syslog,
+                            self.output_options.json,
+                        )
+                        .await;
+
                         continue;
                     }
                 },
@@ -105,12 +107,15 @@ impl TcpClient {
                         &connect_addr.to_string(),
                         e.into(),
                     );
-                    if !self.output_options.quiet {
-                        println!("{msg}");
-                    }
-                    if self.output_options.syslog {
-                        event!(target: APP_NAME, Level::ERROR, "{msg}");
-                    }
+                    output_handler(
+                        LogLevel::ERROR,
+                        &msg,
+                        self.output_options.quiet,
+                        self.output_options.syslog,
+                        self.output_options.json,
+                    )
+                    .await;
+
                     continue;
                 }
             };
@@ -162,15 +167,15 @@ impl TcpClient {
                             &peer_addr,
                             connection_time,
                         );
-                        if !self.output_options.quiet {
-                            println!("{msg}");
-                        }
-                        if self.output_options.syslog {
-                            event!(target: APP_NAME, Level::INFO, "{msg}");
-                        }
-                        if self.output_options.json {
-                            // handle json output
-                        }
+
+                        output_handler(
+                            LogLevel::INFO,
+                            &msg,
+                            self.output_options.quiet,
+                            self.output_options.syslog,
+                            self.output_options.json,
+                        )
+                        .await;
                     }
                 }
                 Err(e) => {
@@ -181,12 +186,14 @@ impl TcpClient {
                         &peer_addr,
                         e.into(),
                     );
-                    if !self.output_options.quiet {
-                        println!("{msg}");
-                    }
-                    if self.output_options.syslog {
-                        event!(target: APP_NAME, Level::ERROR, "{msg}");
-                    }
+                    output_handler(
+                        LogLevel::ERROR,
+                        &msg,
+                        self.output_options.quiet,
+                        self.output_options.syslog,
+                        self.output_options.json,
+                    )
+                    .await;
                 }
             }
         }

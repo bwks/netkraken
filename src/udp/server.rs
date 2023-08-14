@@ -3,11 +3,10 @@ use std::{net::SocketAddr, sync::Arc};
 use anyhow::Result;
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
-use tracing::event;
-use tracing::Level;
 
-use crate::core::common::{ConnectMethod, ConnectResult, OutputOptions};
-use crate::core::konst::{APP_NAME, BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
+use crate::core::common::{ConnectMethod, ConnectResult, LogLevel, OutputOptions};
+use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
+use crate::util::handler::{handle_connect_error, output_handler};
 use crate::util::message::{server_conn_success_msg, server_start_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
@@ -38,9 +37,41 @@ impl UdpServer {
         });
 
         loop {
+            let local_addr = bind_addr.to_string();
+            // let peer_addr = reader.peer_addr()?.to_string();
+            let peer_addr = "172.255.255.255".to_owned();
             let mut buffer = vec![0u8; MAX_PACKET_SIZE];
-            let (len, addr) = reader.recv_from(&mut buffer).await?;
+            let (len, addr) = match reader.recv_from(&mut buffer).await {
+                Ok((len, addr)) => (len, addr),
+                Err(e) => match e.kind() {
+                    // std::io::ErrorKind::ConnectionReset => {
+                    //     println!("peer reset connection");
+                    //     continue;
+                    // }
+                    // _ => {
+                    //     println!("{}", e.kind());
+                    //     println!("{}", e);
+                    //     continue;
+                    // }
+                    // std::io::ErrorKind::ConnectionReset => {
+                    //     let msg =
+                    //         handle_connect_error(peer_addr, local_addr, ConnectMethod::UDP, e);
+                    //     output_handler(
+                    //         LogLevel::ERROR,
+                    //         &msg,
+                    //         self.output_options.quiet,
+                    //         self.output_options.syslog,
+                    //         self.output_options.json,
+                    //     )
+                    //     .await;
+                    //     continue;
+                    // }
+                    _ => continue,
+                },
+            };
+
             buffer.truncate(len);
+            println!("{:#?}", buffer);
 
             let receive_time_utc = time_now_utc();
             let receive_time_stamp = time_now_us()?;
@@ -71,25 +102,24 @@ impl UdpServer {
                     }
                     None => tx_chan.send((buffer.clone(), addr)).await?,
                 }
-                let msg = server_conn_success_msg(
-                    ConnectResult::Ping,
-                    ConnectMethod::UDP,
-                    peer_addr,
-                    local_addr,
-                    client_server_time,
-                );
-                if !self.output_options.quiet {
-                    println!("{msg}");
-                }
-                if self.output_options.syslog {
-                    event!(target: APP_NAME, Level::INFO, "{msg}");
-                }
-                if self.output_options.json {
-                    // json output file
-                }
             } else {
                 tx_chan.send((buffer.clone(), addr)).await?
             }
+            let msg = server_conn_success_msg(
+                ConnectResult::Ping,
+                ConnectMethod::UDP,
+                peer_addr,
+                local_addr,
+                client_server_time,
+            );
+            output_handler(
+                LogLevel::INFO,
+                &msg,
+                self.output_options.quiet,
+                self.output_options.syslog,
+                self.output_options.json,
+            )
+            .await;
         }
     }
 }

@@ -13,6 +13,7 @@ pub enum ConnectResult {
 
     // Errors
     Refused,
+    Reset,
     Timeout,
     Unknown,
 }
@@ -22,6 +23,7 @@ impl Display for ConnectResult {
             ConnectResult::Ping => write!(f, "ping"),
             ConnectResult::Pong => write!(f, "pong"),
             ConnectResult::Refused => write!(f, "refused"),
+            ConnectResult::Reset => write!(f, "reset"),
             ConnectResult::Timeout => write!(f, "timeout"),
             ConnectResult::Unknown => write!(f, "unknown"),
         }
@@ -46,6 +48,15 @@ impl Display for ConnectMethod {
             ConnectMethod::HTTP => write!(f, "http"),
         }
     }
+}
+
+#[allow(dead_code)]
+pub enum LogLevel {
+    DEBUG,
+    ERROR,
+    INFO,
+    WARN,
+    TRACE,
 }
 
 #[derive(Debug)]
