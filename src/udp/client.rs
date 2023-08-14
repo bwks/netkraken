@@ -4,13 +4,11 @@ use std::sync::Arc;
 use anyhow::Result;
 use tokio::net::UdpSocket;
 use tokio::time::{timeout, Duration};
-use tracing::event;
-use tracing::Level;
 use uuid::Uuid;
 
 use crate::core::common::{ConnectMethod, ConnectResult, LogLevel, NetKrakenMessage};
 use crate::core::common::{OutputOptions, PingOptions};
-use crate::core::konst::{APP_NAME, BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
+use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::{loop_handler, output_handler};
 use crate::util::message::{client_conn_success_msg, client_err_msg, ping_header_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
@@ -112,14 +110,6 @@ impl UdpClient {
                         let local_addr = &writer.local_addr()?.to_string();
                         let peer_addr = &addr.to_string();
 
-                        let msg = client_conn_success_msg(
-                            ConnectResult::Pong,
-                            ConnectMethod::UDP,
-                            &local_addr,
-                            &peer_addr,
-                            connection_time,
-                        );
-
                         if len > 0 {
                             let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
@@ -128,14 +118,15 @@ impl UdpClient {
                                 m.round_trip_time_utc = time_now_utc();
                                 m.round_trip_timestamp = time_now_us()?;
                                 m.round_trip_time_ms = connection_time;
-
-                                if self.output_options.json {
-                                    // json output file
-                                    println!("{}", serde_json::to_string(&m)?);
-                                }
                             }
                         }
-
+                        let msg = client_conn_success_msg(
+                            ConnectResult::Pong,
+                            ConnectMethod::UDP,
+                            &local_addr,
+                            &peer_addr,
+                            connection_time,
+                        );
                         output_handler(
                             LogLevel::INFO,
                             &msg,

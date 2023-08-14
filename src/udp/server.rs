@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 
 use crate::core::common::{ConnectMethod, ConnectResult, LogLevel, OutputOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
-use crate::util::handler::{handle_connect_error, output_handler};
+use crate::util::handler::output_handler;
 use crate::util::message::{server_conn_success_msg, server_start_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
@@ -23,6 +23,7 @@ impl UdpServer {
 
         let bind_addr = format!("{}:{}", listen_addr, self.listen_port);
         let socket = UdpSocket::bind(&bind_addr).await?;
+
         let reader = Arc::new(socket);
         let writer = reader.clone();
         let (tx_chan, mut rx_chan) = mpsc::channel::<(Vec<u8>, SocketAddr)>(1);
@@ -37,45 +38,23 @@ impl UdpServer {
         });
 
         loop {
-            let local_addr = bind_addr.to_string();
-            // let peer_addr = reader.peer_addr()?.to_string();
-            let peer_addr = "172.255.255.255".to_owned();
             let mut buffer = vec![0u8; MAX_PACKET_SIZE];
             let (len, addr) = match reader.recv_from(&mut buffer).await {
                 Ok((len, addr)) => (len, addr),
                 Err(e) => match e.kind() {
-                    // std::io::ErrorKind::ConnectionReset => {
-                    //     println!("peer reset connection");
-                    //     continue;
-                    // }
-                    // _ => {
-                    //     println!("{}", e.kind());
-                    //     println!("{}", e);
-                    //     continue;
-                    // }
-                    // std::io::ErrorKind::ConnectionReset => {
-                    //     let msg =
-                    //         handle_connect_error(peer_addr, local_addr, ConnectMethod::UDP, e);
-                    //     output_handler(
-                    //         LogLevel::ERROR,
-                    //         &msg,
-                    //         self.output_options.quiet,
-                    //         self.output_options.syslog,
-                    //         self.output_options.json,
-                    //     )
-                    //     .await;
-                    //     continue;
-                    // }
-                    _ => continue,
+                    _ => {
+                        // Received some kind of connection error
+                        // known errors: ConnectionRest by peer
+                        println!("{}", e.kind().to_string());
+                        continue;
+                    }
                 },
             };
 
             buffer.truncate(len);
-            println!("{:#?}", buffer);
 
             let receive_time_utc = time_now_utc();
             let receive_time_stamp = time_now_us()?;
-
             let local_addr = &reader.local_addr()?.to_string();
             let peer_addr = &addr.to_string();
 

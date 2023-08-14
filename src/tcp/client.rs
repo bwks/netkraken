@@ -10,7 +10,7 @@ use crate::core::common::{
     ConnectMethod, ConnectResult, LogLevel, NetKrakenMessage, OutputOptions, PingOptions,
 };
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
-use crate::util::handler::{loop_handler, output_handler};
+use crate::util::handler::{handle_connect_error, loop_handler, output_handler};
 use crate::util::message::{client_conn_success_msg, client_err_msg, ping_header_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
@@ -85,7 +85,12 @@ impl TcpClient {
                 Ok(s) => match s {
                     Ok(s) => s,
                     Err(e) => {
-                        let msg = handle_connect_error(e, local_addr, connect_addr.to_string());
+                        let msg = handle_connect_error(
+                            local_addr,
+                            connect_addr.to_string(),
+                            ConnectMethod::TCP,
+                            e,
+                        );
 
                         output_handler(
                             LogLevel::ERROR,
@@ -176,6 +181,22 @@ impl TcpClient {
                             self.output_options.json,
                         )
                         .await;
+                    } else {
+                        let msg = client_conn_success_msg(
+                            ConnectResult::Pong,
+                            ConnectMethod::TCP,
+                            &local_addr,
+                            &peer_addr,
+                            connection_time,
+                        );
+                        output_handler(
+                            LogLevel::INFO,
+                            &msg,
+                            self.output_options.quiet,
+                            self.output_options.syslog,
+                            self.output_options.json,
+                        )
+                        .await;
                     }
                 }
                 Err(e) => {
@@ -199,15 +220,6 @@ impl TcpClient {
         }
         Ok(())
     }
-}
-
-pub fn handle_connect_error(error: std::io::Error, source: String, destination: String) -> String {
-    let err = match error.kind() {
-        std::io::ErrorKind::ConnectionRefused => ConnectResult::Refused,
-        std::io::ErrorKind::TimedOut => ConnectResult::Timeout,
-        _ => ConnectResult::Unknown,
-    };
-    client_err_msg(err, ConnectMethod::TCP, &source, &destination, error)
 }
 
 async fn get_tcp_socket(bind_addr: SocketAddr) -> Result<TcpSocket> {
