@@ -8,3 +8,17 @@ Goals:
  - Async
 
 Work in progress
+
+## Testing 
+
+Using [ncat](https://nmap.org/ncat/) as a server. 
+### TCP Server
+```
+ncat -l -k -v 127.0.0.1 8080 --sh-exec "echo ''"
+```
+
+### UDP Server
+```
+ncat -l -u -k -v 127.0.0.1 8080 --sh-exec "echo ''"
+```
+

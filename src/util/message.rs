@@ -98,3 +98,8 @@ pub fn server_conn_success_msg(
     };
     msg
 }
+
+pub fn calc_loss_percent(sent: u16, received: u16) -> String {
+    let percent = (sent as f64 - received as f64) / sent as f64;
+    format!("{:.2}%", percent * 100.0)
+}

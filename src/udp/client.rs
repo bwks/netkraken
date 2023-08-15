@@ -10,7 +10,9 @@ use crate::core::common::{ConnectMethod, ConnectResult, LogLevel, NetKrakenMessa
 use crate::core::common::{OutputOptions, PingOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::{loop_handler, output_handler};
-use crate::util::message::{client_conn_success_msg, client_err_msg, ping_header_msg};
+use crate::util::message::{
+    calc_loss_percent, client_conn_success_msg, client_err_msg, ping_header_msg,
+};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 
@@ -60,6 +62,9 @@ impl UdpClient {
         let uuid = Uuid::new_v4();
         let mut count = 0;
 
+        let mut sent_count: u16 = 0;
+        let mut received_count: u16 = 0;
+
         ping_header_msg(
             &bind_addr.to_string(),
             &peer_addr.to_string(),
@@ -92,6 +97,7 @@ impl UdpClient {
             let pre_conn_timestamp = time_now_us()?;
 
             writer.send(payload.as_bytes()).await?;
+            sent_count += 1;
 
             // Wait for a reply
             let tick = Duration::from_millis(self.ping_options.timeout.into());
@@ -100,6 +106,8 @@ impl UdpClient {
             match timeout(tick, reader.recv_from(&mut buffer)).await {
                 Ok(result) => {
                     if let Ok((len, addr)) = result {
+                        received_count += 1;
+
                         // Record timestamp after connection
                         let post_conn_timestamp = time_now_us()?;
 
@@ -118,6 +126,9 @@ impl UdpClient {
                                 m.round_trip_time_utc = time_now_utc();
                                 m.round_trip_timestamp = time_now_us()?;
                                 m.round_trip_time_ms = connection_time;
+
+                                // TODO: Do something for JSON
+                                // println!("{:#?}", m);
                             }
                         }
                         let msg = client_conn_success_msg(
@@ -156,6 +167,18 @@ impl UdpClient {
                 }
             }
         }
+        println!("");
+        println!(
+            "Summary for {} {}",
+            &peer_addr.to_string(),
+            ConnectMethod::UDP.to_string().to_uppercase()
+        );
+        println!(
+            "sent={} received={} loss={}",
+            sent_count,
+            received_count,
+            calc_loss_percent(sent_count, received_count)
+        );
         Ok(())
     }
 }
