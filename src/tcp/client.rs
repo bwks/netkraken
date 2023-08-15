@@ -11,7 +11,9 @@ use crate::core::common::{
 };
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::{handle_connect_error, loop_handler, output_handler};
-use crate::util::message::{client_conn_success_msg, client_err_msg, ping_header_msg};
+use crate::util::message::{
+    client_conn_success_msg, client_err_msg, client_summary_msg, ping_header_msg,
+};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 
@@ -62,6 +64,10 @@ impl TcpClient {
         let uuid = Uuid::new_v4();
         let mut count: u16 = 0;
 
+        let mut send_count: u16 = 0;
+        let mut received_count: u16 = 0;
+        let mut latencies: Vec<f64> = Vec::new();
+
         ping_header_msg(
             &bind_addr.to_string(),
             &connect_addr.to_string(),
@@ -79,11 +85,15 @@ impl TcpClient {
 
             // record timestamp before connection
             let pre_conn_timestamp = time_now_us()?;
+            send_count += 1;
 
             let tick = Duration::from_millis(self.ping_options.timeout.into());
             let mut stream = match timeout(tick, src_socket.connect(connect_addr)).await {
                 Ok(s) => match s {
-                    Ok(s) => s,
+                    Ok(s) => {
+                        received_count += 1;
+                        s
+                    }
                     Err(e) => {
                         let msg = handle_connect_error(
                             local_addr,
@@ -153,6 +163,7 @@ impl TcpClient {
 
                     // Calculate the round trip time
                     let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
+                    latencies.push(connection_time);
 
                     let local_addr = &writer.local_addr()?.to_string();
                     let peer_addr = &reader.peer_addr()?.to_string();
@@ -218,6 +229,16 @@ impl TcpClient {
                 }
             }
         }
+
+        let summary_msg = client_summary_msg(
+            &connect_addr.to_string(),
+            ConnectMethod::TCP,
+            send_count,
+            received_count,
+            latencies,
+        );
+        println!("{}", summary_msg);
+
         Ok(())
     }
 }

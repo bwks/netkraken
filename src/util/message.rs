@@ -67,6 +67,45 @@ pub fn client_conn_success_msg(
     msg
 }
 
+pub fn client_summary_msg(
+    destination: &String,
+    protocol: ConnectMethod,
+    send_count: u16,
+    received_count: u16,
+    mut latencies: Vec<f64>,
+) -> String {
+    let mut min: f64 = 0.0;
+    let mut max: f64 = 0.0;
+    let mut avg: f64 = 0.0;
+
+    if !latencies.is_empty() {
+        // Filetr our any f64::NAN
+        latencies.retain(|f| !f.is_nan());
+        // Sort lowest to highest
+        latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+        min = *latencies.first().unwrap_or(&0.0);
+        max = *latencies.last().unwrap_or(&0.0);
+        let count: f64 = latencies.iter().sum();
+        avg = count / latencies.len() as f64;
+    }
+
+    format!(
+        "\nStatistics for {} {}
+  sent={} received={} lost={} ({} loss)
+  min={:.2}ms max={:.2}ms avg={:.2}ms",
+        destination,
+        protocol.to_string().to_uppercase(),
+        send_count,
+        received_count,
+        send_count - received_count,
+        calc_loss_percent(send_count, received_count),
+        min,
+        max,
+        avg,
+    )
+}
+
 /// Prints out a server connection success message
 pub fn server_conn_success_msg(
     result: ConnectResult,

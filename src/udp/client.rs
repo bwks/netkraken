@@ -11,7 +11,7 @@ use crate::core::common::{OutputOptions, PingOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::{loop_handler, output_handler};
 use crate::util::message::{
-    calc_loss_percent, client_conn_success_msg, client_err_msg, ping_header_msg,
+    client_conn_success_msg, client_err_msg, client_summary_msg, ping_header_msg,
 };
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
@@ -62,8 +62,9 @@ impl UdpClient {
         let uuid = Uuid::new_v4();
         let mut count = 0;
 
-        let mut sent_count: u16 = 0;
+        let mut send_count: u16 = 0;
         let mut received_count: u16 = 0;
+        let mut latencies: Vec<f64> = Vec::new();
 
         ping_header_msg(
             &bind_addr.to_string(),
@@ -95,9 +96,9 @@ impl UdpClient {
 
             // record timestamp before connection
             let pre_conn_timestamp = time_now_us()?;
+            send_count += 1;
 
             writer.send(payload.as_bytes()).await?;
-            sent_count += 1;
 
             // Wait for a reply
             let tick = Duration::from_millis(self.ping_options.timeout.into());
@@ -114,6 +115,7 @@ impl UdpClient {
                         // Calculate the round trip time
                         let connection_time =
                             calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
+                        latencies.push(connection_time);
 
                         let local_addr = &writer.local_addr()?.to_string();
                         let peer_addr = &addr.to_string();
@@ -167,18 +169,16 @@ impl UdpClient {
                 }
             }
         }
-        println!("");
-        println!(
-            "Summary for {} {}",
+
+        let summary_msg = client_summary_msg(
             &peer_addr.to_string(),
-            ConnectMethod::UDP.to_string().to_uppercase()
-        );
-        println!(
-            "sent={} received={} loss={}",
-            sent_count,
+            ConnectMethod::UDP,
+            send_count,
             received_count,
-            calc_loss_percent(sent_count, received_count)
+            latencies,
         );
+        println!("{}", summary_msg);
+
         Ok(())
     }
 }
