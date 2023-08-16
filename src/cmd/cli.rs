@@ -13,7 +13,7 @@ use crate::util::message::cli_header_msg;
 #[command(name = "nk")]
 #[command(bin_name = "nk")]
 #[command(version = "0.1.0")]
-#[command(about = "Net Kraken, network connectivity tester.", long_about = None)]
+#[command(about = "NetKraken - Cross platform network connectivity tester", long_about = None)]
 pub struct Cli {
     /// Destination hostname or IP address ||
     /// Listen address in `-l --listen` mode
