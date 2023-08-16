@@ -11,8 +11,8 @@ use crate::core::common::{
     PingOptions,
 };
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
-use crate::util::handler::{connect_error_handler, loop_handler, output_handler, output_handler_2};
-use crate::util::message::{client_err_msg, client_summary_msg, ping_header_msg};
+use crate::util::handler::{loop_handler, output_handler};
+use crate::util::message::{client_summary_msg, ping_header_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 
@@ -82,6 +82,14 @@ impl TcpClient {
             let src_socket = get_tcp_socket(bind_addr).await?;
             let local_addr = src_socket.local_addr()?.to_string();
 
+            let mut conn_record = ConnectRecord {
+                result: ConnectResult::Unknown,
+                protocol: ConnectMethod::TCP,
+                source: local_addr,
+                destination: connect_addr.to_string(),
+                time: -1.0,
+            };
+
             // record timestamp before connection
             let pre_conn_timestamp = time_now_us()?;
             send_count += 1;
@@ -94,16 +102,9 @@ impl TcpClient {
                         s
                     }
                     Err(e) => {
-                        let msg = connect_error_handler(
-                            local_addr,
-                            connect_addr.to_string(),
-                            ConnectMethod::TCP,
-                            e,
-                        );
-
                         output_handler(
                             LogLevel::ERROR,
-                            &msg,
+                            &conn_record.client_error_msg(e.into()),
                             self.output_options.quiet,
                             self.output_options.syslog,
                             self.output_options.json,
@@ -114,16 +115,9 @@ impl TcpClient {
                     }
                 },
                 Err(e) => {
-                    let msg = client_err_msg(
-                        ConnectResult::Timeout,
-                        ConnectMethod::TCP,
-                        &bind_addr.to_string(),
-                        &connect_addr.to_string(),
-                        e.into(),
-                    );
                     output_handler(
                         LogLevel::ERROR,
-                        &msg,
+                        &conn_record.client_error_msg(e.into()),
                         self.output_options.quiet,
                         self.output_options.syslog,
                         self.output_options.json,
@@ -137,13 +131,7 @@ impl TcpClient {
             let local_addr = &stream.local_addr()?.to_string();
             let peer_addr = &stream.peer_addr()?.to_string();
 
-            let mut conn_msg = ConnectRecord {
-                result: ConnectResult::Pong,
-                protocol: ConnectMethod::TCP,
-                source: local_addr.to_owned(),
-                destination: peer_addr.to_owned(),
-                time: -1.0,
-            };
+            conn_record.source = local_addr.to_string();
 
             let mut nk_msg = NetKrakenMessage::new(
                 &uuid.to_string(),
@@ -153,7 +141,7 @@ impl TcpClient {
             )?;
             nk_msg.uuid = uuid.to_string();
 
-            let payload = serde_json::to_string(&nk_msg)?;
+            let payload = nk_msg.to_json()?;
             let (mut reader, mut writer) = stream.split();
 
             // Send payload to peer
@@ -170,7 +158,8 @@ impl TcpClient {
 
                     // Calculate the round trip time
                     let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
-                    conn_msg.time = connection_time;
+                    conn_record.result = ConnectResult::Pong;
+                    conn_record.time = connection_time;
                     latencies.push(connection_time);
 
                     if len > 0 {
@@ -183,9 +172,9 @@ impl TcpClient {
                         }
                         // TODO: Do something with nk message
                     }
-                    output_handler_2(
+                    output_handler(
                         LogLevel::INFO,
-                        &conn_msg,
+                        &conn_record.client_success_msg(),
                         self.output_options.quiet,
                         self.output_options.syslog,
                         self.output_options.json,
@@ -193,16 +182,9 @@ impl TcpClient {
                     .await;
                 }
                 Err(e) => {
-                    let msg = client_err_msg(
-                        ConnectResult::Timeout,
-                        ConnectMethod::TCP,
-                        &local_addr,
-                        &peer_addr,
-                        e.into(),
-                    );
                     output_handler(
                         LogLevel::ERROR,
-                        &msg,
+                        &conn_record.client_error_msg(e),
                         self.output_options.quiet,
                         self.output_options.syslog,
                         self.output_options.json,

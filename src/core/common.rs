@@ -4,9 +4,9 @@ use anyhow::Result;
 use clap::ValueEnum;
 use serde_derive::{Deserialize, Serialize};
 
-use crate::util::message::client_conn_success_msg_2;
 use crate::util::time::{time_now_us, time_now_utc};
 
+#[allow(dead_code)]
 #[derive(Copy, Clone, Serialize)]
 pub enum ConnectResult {
     // Success
@@ -135,10 +135,13 @@ impl ConnectRecord {
         )
     }
     pub fn client_error_msg(&self, error: std::io::Error) -> String {
-        let err = match self.result {
-            ConnectResult::Unknown => error.to_string(),
-            _ => self.result.to_string(),
+        let err = match error.kind() {
+            std::io::ErrorKind::ConnectionRefused => ConnectResult::Refused,
+            std::io::ErrorKind::ConnectionReset => ConnectResult::Reset,
+            std::io::ErrorKind::TimedOut => ConnectResult::Timeout,
+            _ => ConnectResult::Unknown,
         };
+
         format!(
             "{} => proto={} src={} dst={}",
             err,
@@ -185,5 +188,10 @@ impl NetKrakenMessage {
         };
 
         Ok(message)
+    }
+
+    pub fn to_json(&self) -> Result<String> {
+        let json_string = serde_json::to_string(&self)?;
+        Ok(json_string)
     }
 }

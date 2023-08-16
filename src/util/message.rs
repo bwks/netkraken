@@ -1,4 +1,4 @@
-use crate::core::common::{ConnectMethod, ConnectRecord, ConnectResult};
+use crate::core::common::{ConnectMethod, ConnectResult};
 
 /// Prints the CLI header message
 pub fn cli_header_msg() {
@@ -25,77 +25,6 @@ pub fn ping_header_msg(source: &String, destination: &String, protocol: ConnectM
         destination,
         protocol.to_string().to_uppercase(),
     );
-}
-
-/// Prints out an error message
-pub fn client_err_msg(
-    result: ConnectResult,
-    protocol: ConnectMethod,
-    source: &String,
-    destination: &String,
-    error: std::io::Error,
-) -> String {
-    let err = match result {
-        ConnectResult::Unknown => error.to_string(),
-        _ => result.to_string(),
-    };
-    format!(
-        "{} => proto={} src={} dst={}",
-        err,
-        protocol.to_string().to_uppercase(),
-        source,
-        destination,
-    )
-}
-
-pub fn client_err_msg_2(connect_record: ConnectRecord, error: std::io::Error) -> String {
-    let err = match connect_record.result {
-        ConnectResult::Unknown => error.to_string(),
-        _ => connect_record.result.to_string(),
-    };
-    format!(
-        "{} => proto={} src={} dst={}",
-        err,
-        connect_record.protocol.to_string().to_uppercase(),
-        connect_record.source,
-        connect_record.destination,
-    )
-}
-
-/// Prints out a client connection success message
-pub fn client_conn_success_msg(
-    result: ConnectResult,
-    protocol: ConnectMethod,
-    source: &String,
-    destination: &String,
-    time: f64,
-) -> String {
-    let msg = format!(
-        "{} => proto={} src={} dst={} time={:.3}ms",
-        result.to_string(),
-        protocol.to_string().to_uppercase(),
-        source,
-        destination,
-        time,
-    );
-    msg
-}
-pub fn client_conn_success_msg_2(
-    result: &ConnectResult,
-    protocol: &ConnectMethod,
-    source: &String,
-    destination: &String,
-    time: f64,
-) -> String {
-    let msg = format!(
-        "{} => proto={} src={} dst={} time={:.3}ms",
-        result.to_string(),
-        protocol.to_string().to_uppercase(),
-        source,
-        destination,
-        time,
-    );
-    msg
 }
 
 pub fn client_summary_msg(
