@@ -39,7 +39,7 @@ pub struct Cli {
     #[clap(short, long, default_value_t = ConnectMethod::TCP)]
     pub method: ConnectMethod,
 
-    /// Repeat count (0 for infinite)
+    /// Repeat count (0 == max == 65535)
     #[clap(short, long, default_value_t = 4)]
     pub repeat: u16,
 

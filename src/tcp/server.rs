@@ -27,9 +27,7 @@ impl TcpServer {
         server_start_msg(ConnectMethod::TCP, &bind_addr);
 
         loop {
-            let quiet_output = self.output_options.quiet;
-            let syslog_output = self.output_options.syslog;
-            let json_output = self.output_options.json;
+            let output_options = self.output_options;
             // Receive stream
             let (mut stream, _) = listener.accept().await?;
 
@@ -69,14 +67,7 @@ impl TcpServer {
                     &stream.local_addr()?.to_string(),
                     client_server_time,
                 );
-                output_handler(
-                    LogLevel::INFO,
-                    &msg,
-                    quiet_output,
-                    syslog_output,
-                    json_output,
-                )
-                .await;
+                output_handler(LogLevel::INFO, &msg, &output_options).await;
 
                 // Flush buffer
                 buffer.clear();

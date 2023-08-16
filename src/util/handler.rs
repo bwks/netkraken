@@ -3,6 +3,7 @@ use tracing::event;
 use tracing::Level;
 
 use crate::core::common::LogLevel;
+use crate::core::common::OutputOptions;
 use crate::core::konst::APP_NAME;
 
 pub async fn loop_handler(count: u16, repeat: u16, sleep_interval: u16) -> bool {
@@ -19,17 +20,11 @@ pub async fn loop_handler(count: u16, repeat: u16, sleep_interval: u16) -> bool 
     }
 }
 
-pub async fn output_handler(
-    log_level: LogLevel,
-    message: &String,
-    quiet_output: bool,
-    syslog_output: bool,
-    json_output: bool,
-) {
-    if !quiet_output {
+pub async fn output_handler(log_level: LogLevel, message: &String, output_options: &OutputOptions) {
+    if !output_options.quiet {
         println!("{message}");
     }
-    if syslog_output {
+    if output_options.syslog {
         match log_level {
             LogLevel::DEBUG => event!(target: APP_NAME, Level::DEBUG, "{message}"),
             LogLevel::ERROR => event!(target: APP_NAME, Level::ERROR, "{message}"),
@@ -38,7 +33,7 @@ pub async fn output_handler(
             LogLevel::TRACE => event!(target: APP_NAME, Level::TRACE, "{message}"),
         };
     }
-    if json_output {
+    if output_options.json {
         // json handler
     }
 }

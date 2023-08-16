@@ -61,7 +61,7 @@ pub enum LogLevel {
     TRACE,
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct OutputOptions {
     pub quiet: bool,
     pub json: bool,
@@ -78,7 +78,7 @@ impl Default for OutputOptions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug)]
 pub struct PingOptions {
     pub repeat: u16,
     pub interval: u16,

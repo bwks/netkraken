@@ -1,8 +1,10 @@
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use anyhow::Result;
 use tokio::net::UdpSocket;
+use tokio::signal;
 use tokio::time::{timeout, Duration};
 use uuid::Uuid;
 
@@ -72,7 +74,18 @@ impl UdpClient {
             ConnectMethod::UDP,
         );
 
+        let cancel = Arc::new(AtomicBool::new(false));
+        let c = cancel.clone();
+        tokio::spawn(async move {
+            signal::ctrl_c().await.unwrap();
+            // Your handler here
+            c.store(true, Ordering::SeqCst);
+        });
+
         loop {
+            if cancel.load(Ordering::SeqCst) {
+                break;
+            }
             match loop_handler(count, self.ping_options.repeat, self.ping_options.interval).await {
                 true => break,
                 false => count += 1,
@@ -144,9 +157,7 @@ impl UdpClient {
                         output_handler(
                             LogLevel::INFO,
                             &conn_record.client_success_msg(),
-                            self.output_options.quiet,
-                            self.output_options.syslog,
-                            self.output_options.json,
+                            &self.output_options,
                         )
                         .await;
                     }
@@ -156,9 +167,7 @@ impl UdpClient {
                     output_handler(
                         LogLevel::ERROR,
                         &conn_record.client_error_msg(e.into()),
-                        self.output_options.quiet,
-                        self.output_options.syslog,
-                        self.output_options.json,
+                        &self.output_options,
                     )
                     .await;
                 }

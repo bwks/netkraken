@@ -91,14 +91,7 @@ impl UdpServer {
                 local_addr,
                 client_server_time,
             );
-            output_handler(
-                LogLevel::INFO,
-                &msg,
-                self.output_options.quiet,
-                self.output_options.syslog,
-                self.output_options.json,
-            )
-            .await;
+            output_handler(LogLevel::INFO, &msg, &self.output_options).await;
         }
     }
 }

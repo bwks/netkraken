@@ -37,9 +37,13 @@ async fn main() -> ExitCode {
         Err(e) => {
             match e.source() {
                 Some(s) => {
+                    eprintln!("{s}");
                     event!(target: APP_NAME, Level::ERROR, "{s}")
                 }
-                None => event!(target: APP_NAME, Level::ERROR, "{e}"),
+                None => {
+                    eprintln!("{e}");
+                    event!(target: APP_NAME, Level::ERROR, "{e}")
+                }
             }
             ExitCode::from(1)
         }
