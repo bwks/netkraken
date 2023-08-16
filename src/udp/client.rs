@@ -6,13 +6,13 @@ use tokio::net::UdpSocket;
 use tokio::time::{timeout, Duration};
 use uuid::Uuid;
 
-use crate::core::common::{ConnectMethod, ConnectResult, LogLevel, NetKrakenMessage};
+use crate::core::common::{
+    ConnectMethod, ConnectRecord, ConnectResult, LogLevel, NetKrakenMessage,
+};
 use crate::core::common::{OutputOptions, PingOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::{loop_handler, output_handler};
-use crate::util::message::{
-    client_conn_success_msg, client_err_msg, client_summary_msg, ping_header_msg,
-};
+use crate::util::message::{client_summary_msg, ping_header_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 
@@ -84,6 +84,13 @@ impl UdpClient {
             let writer = reader.clone();
             writer.connect(peer_addr).await?;
 
+            let mut conn_record = ConnectRecord {
+                result: ConnectResult::Unknown,
+                protocol: ConnectMethod::UDP,
+                source: writer.local_addr()?.to_string().to_owned(),
+                destination: peer_addr.to_string().to_owned(),
+                time: -1.0,
+            };
             let mut nk_msg = NetKrakenMessage::new(
                 &uuid.to_string(),
                 &writer.local_addr()?.to_string(),
@@ -106,7 +113,7 @@ impl UdpClient {
 
             match timeout(tick, reader.recv_from(&mut buffer)).await {
                 Ok(result) => {
-                    if let Ok((len, addr)) = result {
+                    if let Ok((len, _addr)) = result {
                         received_count += 1;
 
                         // Record timestamp after connection
@@ -115,10 +122,10 @@ impl UdpClient {
                         // Calculate the round trip time
                         let connection_time =
                             calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
-                        latencies.push(connection_time);
 
-                        let local_addr = &writer.local_addr()?.to_string();
-                        let peer_addr = &addr.to_string();
+                        conn_record.result = ConnectResult::Pong;
+                        conn_record.time = connection_time;
+                        latencies.push(connection_time);
 
                         if len > 0 {
                             let data_string = &String::from_utf8_lossy(&buffer[..len]);
@@ -129,20 +136,14 @@ impl UdpClient {
                                 m.round_trip_timestamp = time_now_us()?;
                                 m.round_trip_time_ms = connection_time;
 
-                                // TODO: Do something for JSON
+                                // TODO: Do something with nk message
                                 // println!("{:#?}", m);
                             }
                         }
-                        let msg = client_conn_success_msg(
-                            ConnectResult::Pong,
-                            ConnectMethod::UDP,
-                            &local_addr,
-                            &peer_addr,
-                            connection_time,
-                        );
+
                         output_handler(
                             LogLevel::INFO,
-                            &msg,
+                            &conn_record.client_success_msg(),
                             self.output_options.quiet,
                             self.output_options.syslog,
                             self.output_options.json,
@@ -151,16 +152,10 @@ impl UdpClient {
                     }
                 }
                 Err(e) => {
-                    let msg = client_err_msg(
-                        ConnectResult::Timeout,
-                        ConnectMethod::UDP,
-                        &writer.local_addr()?.to_string(),
-                        &peer_addr.to_string(),
-                        e.into(),
-                    );
+                    conn_record.result = ConnectResult::Timeout;
                     output_handler(
                         LogLevel::ERROR,
-                        &msg,
+                        &conn_record.client_error_msg(e.into()),
                         self.output_options.quiet,
                         self.output_options.syslog,
                         self.output_options.json,

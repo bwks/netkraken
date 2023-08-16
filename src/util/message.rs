@@ -1,4 +1,4 @@
-use crate::core::common::{ConnectMethod, ConnectResult};
+use crate::core::common::{ConnectMethod, ConnectRecord, ConnectResult};
 
 /// Prints the CLI header message
 pub fn cli_header_msg() {
@@ -48,10 +48,41 @@ pub fn client_err_msg(
     )
 }
 
+pub fn client_err_msg_2(connect_record: ConnectRecord, error: std::io::Error) -> String {
+    let err = match connect_record.result {
+        ConnectResult::Unknown => error.to_string(),
+        _ => connect_record.result.to_string(),
+    };
+    format!(
+        "{} => proto={} src={} dst={}",
+        err,
+        connect_record.protocol.to_string().to_uppercase(),
+        connect_record.source,
+        connect_record.destination,
+    )
+}
+
 /// Prints out a client connection success message
 pub fn client_conn_success_msg(
     result: ConnectResult,
     protocol: ConnectMethod,
+    source: &String,
+    destination: &String,
+    time: f64,
+) -> String {
+    let msg = format!(
+        "{} => proto={} src={} dst={} time={:.3}ms",
+        result.to_string(),
+        protocol.to_string().to_uppercase(),
+        source,
+        destination,
+        time,
+    );
+    msg
+}
+pub fn client_conn_success_msg_2(
+    result: &ConnectResult,
+    protocol: &ConnectMethod,
     source: &String,
     destination: &String,
     time: f64,
@@ -82,6 +113,7 @@ pub fn client_summary_msg(
         // Filetr our any f64::NAN
         latencies.retain(|f| !f.is_nan());
         // Sort lowest to highest
+        // TODO: Fix this unwrap
         latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
         min = *latencies.first().unwrap_or(&0.0);
@@ -91,9 +123,9 @@ pub fn client_summary_msg(
     }
 
     format!(
-        "\nStatistics for {} {}
-  sent={} received={} lost={} ({} loss)
-  min={:.2}ms max={:.2}ms avg={:.2}ms",
+        "\nStatistics for {} {} connection
+ sent={} received={} lost={} ({} loss)
+ min={:.3}ms max={:.3}ms avg={:.3}ms",
         destination,
         protocol.to_string().to_uppercase(),
         send_count,

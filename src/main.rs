@@ -19,13 +19,18 @@ async fn main() -> ExitCode {
     let file_appender = rolling::never(&cli.dir, &cli.file);
     let (logfile, _guard) = tracing_appender::non_blocking(file_appender);
 
-    tracing_subscriber::fmt()
+    let tracer = tracing_subscriber::fmt()
         .with_env_filter(
             std::env::var("RUST_LOG").unwrap_or_else(|_| format!("{APP_NAME}=info").into()),
         )
         .with_writer(logfile)
-        .with_ansi(false)
-        .init();
+        .with_ansi(false);
+
+    if cli.json {
+        tracer.json().init();
+    } else {
+        tracer.init();
+    }
 
     match cli.run().await {
         Ok(()) => ExitCode::from(0),

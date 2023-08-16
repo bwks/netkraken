@@ -51,7 +51,7 @@ pub struct Cli {
     #[clap(long, default_value_t = 0)]
     pub src_port: u16,
 
-    /// Timeout between pings (in milliseconds)
+    /// Connection timeout (in milliseconds)
     #[clap(short, long, default_value_t = 5000)]
     pub timeout: u16,
 

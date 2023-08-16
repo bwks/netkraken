@@ -7,13 +7,12 @@ use tokio::time::{timeout, Duration};
 use uuid::Uuid;
 
 use crate::core::common::{
-    ConnectMethod, ConnectResult, LogLevel, NetKrakenMessage, OutputOptions, PingOptions,
+    ConnectMethod, ConnectRecord, ConnectResult, LogLevel, NetKrakenMessage, OutputOptions,
+    PingOptions,
 };
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
-use crate::util::handler::{handle_connect_error, loop_handler, output_handler};
-use crate::util::message::{
-    client_conn_success_msg, client_err_msg, client_summary_msg, ping_header_msg,
-};
+use crate::util::handler::{connect_error_handler, loop_handler, output_handler, output_handler_2};
+use crate::util::message::{client_err_msg, client_summary_msg, ping_header_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 
@@ -95,7 +94,7 @@ impl TcpClient {
                         s
                     }
                     Err(e) => {
-                        let msg = handle_connect_error(
+                        let msg = connect_error_handler(
                             local_addr,
                             connect_addr.to_string(),
                             ConnectMethod::TCP,
@@ -138,6 +137,14 @@ impl TcpClient {
             let local_addr = &stream.local_addr()?.to_string();
             let peer_addr = &stream.peer_addr()?.to_string();
 
+            let mut conn_msg = ConnectRecord {
+                result: ConnectResult::Pong,
+                protocol: ConnectMethod::TCP,
+                source: local_addr.to_owned(),
+                destination: peer_addr.to_owned(),
+                time: -1.0,
+            };
+
             let mut nk_msg = NetKrakenMessage::new(
                 &uuid.to_string(),
                 &local_addr,
@@ -163,10 +170,8 @@ impl TcpClient {
 
                     // Calculate the round trip time
                     let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
+                    conn_msg.time = connection_time;
                     latencies.push(connection_time);
-
-                    let local_addr = &writer.local_addr()?.to_string();
-                    let peer_addr = &reader.peer_addr()?.to_string();
 
                     if len > 0 {
                         let data_string = &String::from_utf8_lossy(&buffer[..len]);
@@ -176,39 +181,16 @@ impl TcpClient {
                             m.round_trip_timestamp = time_now_us()?;
                             m.round_trip_time_ms = connection_time;
                         }
-                        let msg = client_conn_success_msg(
-                            ConnectResult::Pong,
-                            ConnectMethod::TCP,
-                            &local_addr,
-                            &peer_addr,
-                            connection_time,
-                        );
-
-                        output_handler(
-                            LogLevel::INFO,
-                            &msg,
-                            self.output_options.quiet,
-                            self.output_options.syslog,
-                            self.output_options.json,
-                        )
-                        .await;
-                    } else {
-                        let msg = client_conn_success_msg(
-                            ConnectResult::Pong,
-                            ConnectMethod::TCP,
-                            &local_addr,
-                            &peer_addr,
-                            connection_time,
-                        );
-                        output_handler(
-                            LogLevel::INFO,
-                            &msg,
-                            self.output_options.quiet,
-                            self.output_options.syslog,
-                            self.output_options.json,
-                        )
-                        .await;
+                        // TODO: Do something with nk message
                     }
+                    output_handler_2(
+                        LogLevel::INFO,
+                        &conn_msg,
+                        self.output_options.quiet,
+                        self.output_options.syslog,
+                        self.output_options.json,
+                    )
+                    .await;
                 }
                 Err(e) => {
                     let msg = client_err_msg(

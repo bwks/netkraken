@@ -4,8 +4,10 @@ use anyhow::Result;
 use clap::ValueEnum;
 use serde_derive::{Deserialize, Serialize};
 
+use crate::util::message::client_conn_success_msg_2;
 use crate::util::time::{time_now_us, time_now_utc};
 
+#[derive(Copy, Clone, Serialize)]
 pub enum ConnectResult {
     // Success
     Ping,
@@ -30,7 +32,7 @@ impl Display for ConnectResult {
     }
 }
 
-#[derive(ValueEnum, Clone, Debug, Default)]
+#[derive(ValueEnum, Copy, Clone, Debug, Default, Serialize)]
 pub enum ConnectMethod {
     #[default]
     TCP,
@@ -90,6 +92,60 @@ impl Default for PingOptions {
             interval: 1000,
             timeout: 1000,
         }
+    }
+}
+
+#[derive(Serialize)]
+pub struct ConnectRecord {
+    pub result: ConnectResult,
+    pub protocol: ConnectMethod,
+    pub source: String,
+    pub destination: String,
+    pub time: f64,
+}
+
+impl Display for ConnectRecord {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let msg = format!(
+            "result: {}
+protocol: {}
+source: {}
+destination: {}
+time: {:.3}
+",
+            self.result,
+            self.protocol.to_string().to_uppercase(),
+            self.source,
+            self.destination,
+            self.time
+        );
+        write!(f, "{msg}")
+    }
+}
+
+impl ConnectRecord {
+    pub fn client_success_msg(&self) -> String {
+        format!(
+            "{} => proto={} src={} dst={} time={:.3}ms",
+            self.result.to_string(),
+            self.protocol.to_string().to_uppercase(),
+            self.source,
+            self.destination,
+            self.time,
+        )
+    }
+    pub fn client_error_msg(&self, error: std::io::Error) -> String {
+        let err = match self.result {
+            ConnectResult::Unknown => error.to_string(),
+            _ => self.result.to_string(),
+        };
+        format!(
+            "{} => proto={} src={} dst={}",
+            err,
+            self.protocol.to_string().to_uppercase(),
+            self.source,
+            self.destination,
+        )
     }
 }
 
