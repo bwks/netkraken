@@ -52,11 +52,11 @@ pub fn client_summary_msg(
     }
 
     format!(
-        "\nStatistics for {} {} connection
+        "\nStatistics for {} connection to {} 
  sent={} received={} lost={} ({} loss)
  min={:.3}ms max={:.3}ms avg={:.3}ms",
-        destination,
         protocol.to_string().to_uppercase(),
+        destination,
         send_count,
         received_count,
         send_count - received_count,
