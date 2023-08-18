@@ -24,7 +24,8 @@ impl TcpServer {
 
         let listener = TcpListener::bind(&bind_addr).await?;
 
-        server_start_msg(ConnectMethod::TCP, &bind_addr);
+        let start_msg = server_start_msg(ConnectMethod::TCP, &bind_addr);
+        println!("{}", start_msg);
 
         loop {
             let output_options = self.output_options;

@@ -80,7 +80,8 @@ impl Cli {
     }
 
     pub async fn run(&self) -> Result<()> {
-        cli_header_msg();
+        let header_msg = cli_header_msg();
+        println!("{header_msg}");
         let cli = Cli::parse();
 
         let mut ping_options = PingOptions::default();

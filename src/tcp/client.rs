@@ -70,11 +70,12 @@ impl TcpClient {
         let mut received_count: u16 = 0;
         let mut latencies: Vec<f64> = Vec::new();
 
-        ping_header_msg(
+        let ping_header = ping_header_msg(
             &bind_addr.to_string(),
             &connect_addr.to_string(),
             ConnectMethod::TCP,
         );
+        println!("{ping_header}");
 
         let cancel = Arc::new(AtomicBool::new(false));
         let c = cancel.clone();
