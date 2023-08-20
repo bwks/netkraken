@@ -12,7 +12,7 @@ use crate::core::common::{
     ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, LogLevel, NetKrakenMessage,
 };
 use crate::core::common::{OutputOptions, PingOptions};
-use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
+use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE, PING_MSG};
 use crate::util::handler::{loop_handler, output_handler};
 use crate::util::message::{client_summary_msg, ping_header_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
@@ -96,6 +96,10 @@ impl UdpClient {
 
             let reader = Arc::new(socket);
             let writer = reader.clone();
+
+            // record timestamp before connection
+            let pre_conn_timestamp = time_now_us()?;
+            send_count += 1;
             writer.connect(peer_addr).await?;
 
             let mut conn_record = ConnectRecord {
@@ -105,21 +109,22 @@ impl UdpClient {
                 destination: peer_addr.to_string().to_owned(),
                 time: -1.0,
             };
-            let mut nk_msg = NetKrakenMessage::new(
-                &uuid.to_string(),
-                &writer.local_addr()?.to_string(),
-                &peer_addr.to_string(),
-                ConnectMethod::UDP,
-            )?;
-            nk_msg.uuid = uuid.to_string();
 
-            let payload = serde_json::to_string(&nk_msg)?;
+            if self.ping_options.nk_peer_messaging {
+                let mut nk_msg = NetKrakenMessage::new(
+                    &uuid.to_string(),
+                    &writer.local_addr()?.to_string(),
+                    &peer_addr.to_string(),
+                    ConnectMethod::UDP,
+                )?;
+                nk_msg.uuid = uuid.to_string();
 
-            // record timestamp before connection
-            let pre_conn_timestamp = time_now_us()?;
-            send_count += 1;
+                let payload = serde_json::to_string(&nk_msg)?;
 
-            writer.send(payload.as_bytes()).await?;
+                writer.send(payload.as_bytes()).await?;
+            } else {
+                writer.send(PING_MSG.as_bytes()).await?;
+            }
 
             // Wait for a reply
             let tick = Duration::from_millis(self.ping_options.timeout.into());
@@ -141,7 +146,7 @@ impl UdpClient {
                         conn_record.time = connection_time;
                         latencies.push(connection_time);
 
-                        if len > 0 {
+                        if self.ping_options.nk_peer_messaging && len > 0 {
                             let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
                             // Handle connection to a NetKraken peer
