@@ -83,6 +83,7 @@ pub struct PingOptions {
     pub repeat: u16,
     pub interval: u16,
     pub timeout: u16,
+    pub nk_peer_messaging: bool,
 }
 
 impl Default for PingOptions {
@@ -91,6 +92,7 @@ impl Default for PingOptions {
             repeat: 4,
             interval: 1000,
             timeout: 1000,
+            nk_peer_messaging: true,
         }
     }
 }
@@ -150,6 +152,12 @@ impl ConnectRecord {
             self.destination,
         )
     }
+}
+
+pub struct ClientSummary {
+    pub send_count: u16,
+    pub received_count: u16,
+    pub latencies: Vec<f64>,
 }
 
 #[derive(Clone, Default, Debug, Deserialize, Serialize)]

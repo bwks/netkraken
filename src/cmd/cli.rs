@@ -55,6 +55,10 @@ pub struct Cli {
     #[clap(short, long, default_value_t = 5000)]
     pub timeout: u16,
 
+    /// NetKraken peer messaging
+    #[clap(short, long, default_value_t = false)]
+    pub nk_peer: bool,
+
     // Output options
     /// Log to file in JSON format
     #[clap(short, long, default_value_t = false)]
@@ -88,6 +92,7 @@ impl Cli {
         ping_options.repeat = cli.repeat;
         ping_options.interval = cli.interval;
         ping_options.timeout = cli.timeout;
+        ping_options.nk_peer_messaging = cli.nk_peer;
 
         let mut output_options = OutputOptions::default();
         output_options.json = cli.json;

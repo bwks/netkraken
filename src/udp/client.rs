@@ -9,7 +9,7 @@ use tokio::time::{timeout, Duration};
 use uuid::Uuid;
 
 use crate::core::common::{
-    ConnectMethod, ConnectRecord, ConnectResult, LogLevel, NetKrakenMessage,
+    ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, LogLevel, NetKrakenMessage,
 };
 use crate::core::common::{OutputOptions, PingOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
@@ -175,13 +175,13 @@ impl UdpClient {
             }
         }
 
-        let summary_msg = client_summary_msg(
-            &peer_addr.to_string(),
-            ConnectMethod::UDP,
+        let client_summary = ClientSummary {
             send_count,
             received_count,
             latencies,
-        );
+        };
+        let summary_msg =
+            client_summary_msg(&peer_addr.to_string(), ConnectMethod::UDP, client_summary);
         println!("{}", summary_msg);
 
         Ok(())

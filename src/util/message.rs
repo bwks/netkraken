@@ -1,4 +1,4 @@
-use crate::core::common::{ConnectMethod, ConnectResult};
+use crate::core::common::{ClientSummary, ConnectMethod, ConnectResult};
 
 /// Return the CLI header message
 pub fn cli_header_msg() -> String {
@@ -30,15 +30,14 @@ pub fn ping_header_msg(source: &String, destination: &String, protocol: ConnectM
 pub fn client_summary_msg(
     destination: &String,
     protocol: ConnectMethod,
-    send_count: u16,
-    received_count: u16,
-    mut latencies: Vec<f64>,
+    client_summary: ClientSummary,
 ) -> String {
     let mut min: f64 = 0.0;
     let mut max: f64 = 0.0;
     let mut avg: f64 = 0.0;
 
-    if !latencies.is_empty() {
+    if !client_summary.latencies.is_empty() {
+        let mut latencies = client_summary.latencies;
         // Filetr our any f64::NAN
         latencies.retain(|f| !f.is_nan());
         // Sort lowest to highest
@@ -57,10 +56,10 @@ pub fn client_summary_msg(
  min={:.3}ms max={:.3}ms avg={:.3}ms",
         protocol.to_string().to_uppercase(),
         destination,
-        send_count,
-        received_count,
-        send_count - received_count,
-        calc_loss_percent(send_count, received_count),
+        client_summary.send_count,
+        client_summary.received_count,
+        client_summary.send_count - client_summary.received_count,
+        calc_loss_percent(client_summary.send_count, client_summary.received_count),
         min,
         max,
         avg,
@@ -150,12 +149,15 @@ mod tests {
 
     #[test]
     fn client_summary_msg_is_expected() {
+        let client_summary = ClientSummary {
+            send_count: 4,
+            received_count: 3,
+            latencies: vec![104.921, 108.447, 105.009],
+        };
         let msg = client_summary_msg(
             &"198.51.100.1:443".to_string(),
             ConnectMethod::TCP,
-            4 as u16,
-            3 as u16,
-            vec![104.921, 108.447, 105.009],
+            client_summary,
         );
 
         assert_eq!(
