@@ -26,10 +26,9 @@ async fn main() -> ExitCode {
         .with_writer(logfile)
         .with_ansi(false);
 
-    if cli.json {
-        tracer.json().init();
-    } else {
-        tracer.init();
+    match cli.json {
+        true => tracer.json().init(),
+        false => tracer.init(),
     }
 
     match cli.run().await {

@@ -13,7 +13,7 @@ use crate::core::common::{
     ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, LogLevel, NetKrakenMessage,
     OutputOptions, PingOptions,
 };
-use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
+use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE, PING_MSG};
 use crate::util::handler::{loop_handler, output_handler};
 use crate::util::message::{client_summary_msg, ping_header_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
@@ -21,9 +21,9 @@ use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 
 #[derive(Debug)]
 pub struct TcpClient {
-    pub dst_addr: String,
+    pub dst_ip: String,
     pub dst_port: u16,
-    pub src_addr: String,
+    pub src_ip: String,
     pub src_port: u16,
     pub output_options: OutputOptions,
     pub ping_options: PingOptions,
@@ -31,14 +31,14 @@ pub struct TcpClient {
 
 impl TcpClient {
     pub fn new(
-        dst_addr: String,
+        dst_ip: String,
         dst_port: u16,
-        src_addr: Option<String>,
+        src_ip: Option<String>,
         src_port: Option<u16>,
         output_options: OutputOptions,
         ping_options: PingOptions,
     ) -> TcpClient {
-        let src_addr = match src_addr {
+        let src_ip = match src_ip {
             Some(x) => x,
             None => BIND_ADDR.to_owned(),
         };
@@ -47,9 +47,9 @@ impl TcpClient {
             None => BIND_PORT,
         };
         TcpClient {
-            dst_addr,
+            dst_ip,
             dst_port,
-            src_addr,
+            src_ip,
             src_port,
             output_options,
             ping_options,
@@ -57,11 +57,11 @@ impl TcpClient {
     }
 
     pub async fn connect(&self) -> Result<()> {
-        let src_addr = parse_ipaddr(&self.src_addr)?;
-        let dst_addr = parse_ipaddr(&self.dst_addr)?;
+        let src_ip = parse_ipaddr(&self.src_ip)?;
+        let dst_ip = parse_ipaddr(&self.dst_ip)?;
 
-        let bind_addr = SocketAddr::new(src_addr, self.src_port);
-        let connect_addr = SocketAddr::new(dst_addr, self.dst_port);
+        let bind_addr = SocketAddr::new(src_ip, self.src_port);
+        let connect_addr = SocketAddr::new(dst_ip, self.dst_port);
 
         let uuid = Uuid::new_v4();
         let mut count: u16 = 0;
@@ -116,6 +116,7 @@ impl TcpClient {
                         received_count += 1;
                         s
                     }
+                    // Connection timeout
                     Err(e) => {
                         output_handler(
                             LogLevel::ERROR,
@@ -123,7 +124,6 @@ impl TcpClient {
                             &self.output_options,
                         )
                         .await;
-
                         continue;
                     }
                 },
@@ -138,86 +138,76 @@ impl TcpClient {
                     continue;
                 }
             };
+            // Record timestamp after connection
+            let post_conn_timestamp = time_now_us()?;
 
             let local_addr = &stream.local_addr()?.to_string();
             let peer_addr = &stream.peer_addr()?.to_string();
 
             conn_record.source = local_addr.to_string();
 
-            if self.ping_options.nk_peer_messaging {
-                let mut nk_msg = NetKrakenMessage::new(
-                    &uuid.to_string(),
-                    &local_addr,
-                    &peer_addr,
-                    ConnectMethod::TCP,
-                )?;
-                nk_msg.uuid = uuid.to_string();
+            // Calculate the round trip time
+            let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
+            conn_record.result = ConnectResult::Pong;
+            conn_record.time = connection_time;
+            latencies.push(connection_time);
 
-                let payload = nk_msg.to_json()?;
-                let (mut reader, mut writer) = stream.split();
+            let (mut reader, mut writer) = stream.split();
 
-                // Send payload to peer
-                writer.write_all(payload.as_bytes()).await?;
-                writer.shutdown().await?;
+            match self.ping_options.nk_peer_messaging {
+                false => {
+                    writer.write_all(PING_MSG.as_bytes()).await?;
+                }
+                true => {
+                    let mut nk_msg = NetKrakenMessage::new(
+                        &uuid.to_string(),
+                        &local_addr,
+                        &peer_addr,
+                        ConnectMethod::TCP,
+                    )?;
+                    nk_msg.uuid = uuid.to_string();
 
-                // Wait for reply
-                let mut buffer = vec![0u8; MAX_PACKET_SIZE];
+                    let payload = nk_msg.to_json()?;
 
-                match reader.read_to_end(&mut buffer).await {
-                    Ok(len) => {
-                        // Record timestamp after connection
-                        let post_conn_timestamp = time_now_us()?;
+                    // Send payload to peer
+                    writer.write_all(payload.as_bytes()).await?;
+                }
+            }
 
-                        // Calculate the round trip time
-                        let connection_time =
-                            calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
-                        conn_record.result = ConnectResult::Pong;
-                        conn_record.time = connection_time;
-                        latencies.push(connection_time);
+            writer.shutdown().await?;
 
-                        if len > 0 {
-                            let data_string = &String::from_utf8_lossy(&buffer[..len]);
+            // Wait for reply
+            let mut buffer = vec![0u8; MAX_PACKET_SIZE];
 
-                            if let Some(mut m) = nk_msg_reader(&data_string) {
-                                m.round_trip_time_utc = time_now_utc();
-                                m.round_trip_timestamp = time_now_us()?;
-                                m.round_trip_time_ms = connection_time;
-                            }
-                            // TODO: Do something with nk message
+            match reader.read_to_end(&mut buffer).await {
+                Ok(len) => {
+                    if self.ping_options.nk_peer_messaging && len > 0 {
+                        let data_string = &String::from_utf8_lossy(&buffer[..len]);
+
+                        if let Some(mut m) = nk_msg_reader(&data_string) {
+                            m.round_trip_time_utc = time_now_utc();
+                            m.round_trip_timestamp = time_now_us()?;
+                            m.round_trip_time_ms = connection_time;
                         }
-                        output_handler(
-                            LogLevel::INFO,
-                            &conn_record.client_success_msg(),
-                            &self.output_options,
-                        )
-                        .await;
-                    }
-                    Err(e) => {
-                        output_handler(
-                            LogLevel::ERROR,
-                            &conn_record.client_error_msg(e),
-                            &self.output_options,
-                        )
-                        .await;
+                        // TODO: Do something with nk message
                     }
                 }
-            } else {
-                // Record timestamp after connection
-                let post_conn_timestamp = time_now_us()?;
-
-                // Calculate the round trip time
-                let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
-                conn_record.result = ConnectResult::Pong;
-                conn_record.time = connection_time;
-                latencies.push(connection_time);
-
-                output_handler(
-                    LogLevel::INFO,
-                    &conn_record.client_success_msg(),
-                    &self.output_options,
-                )
-                .await;
+                Err(e) => {
+                    output_handler(
+                        LogLevel::ERROR,
+                        &conn_record.client_error_msg(e),
+                        &self.output_options,
+                    )
+                    .await;
+                }
             }
+
+            output_handler(
+                LogLevel::INFO,
+                &conn_record.client_success_msg(),
+                &self.output_options,
+            )
+            .await;
         }
 
         let client_summary = ClientSummary {

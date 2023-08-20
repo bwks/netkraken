@@ -19,7 +19,7 @@ use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 
 pub struct UdpClient {
-    pub dst_addr: String,
+    pub dst_ip: String,
     pub dst_port: u16,
     pub src_addr: String,
     pub src_port: u16,
@@ -29,7 +29,7 @@ pub struct UdpClient {
 
 impl UdpClient {
     pub fn new(
-        dst_addr: String,
+        dst_ip: String,
         dst_port: u16,
         src_addr: Option<String>,
         src_port: Option<u16>,
@@ -45,7 +45,7 @@ impl UdpClient {
             None => BIND_PORT,
         };
         UdpClient {
-            dst_addr,
+            dst_ip,
             dst_port,
             src_addr,
             src_port,
@@ -56,10 +56,10 @@ impl UdpClient {
 
     pub async fn connect(&self) -> Result<()> {
         let src_addr = parse_ipaddr(&self.src_addr)?;
-        let dst_addr = parse_ipaddr(&self.dst_addr)?;
+        let dst_ip = parse_ipaddr(&self.dst_ip)?;
 
         let bind_addr = SocketAddr::new(src_addr, self.src_port);
-        let peer_addr = SocketAddr::new(dst_addr, self.dst_port);
+        let peer_addr = SocketAddr::new(dst_ip, self.dst_port);
 
         let uuid = Uuid::new_v4();
         let mut count = 0;
@@ -97,11 +97,6 @@ impl UdpClient {
             let reader = Arc::new(socket);
             let writer = reader.clone();
 
-            // record timestamp before connection
-            let pre_conn_timestamp = time_now_us()?;
-            send_count += 1;
-            writer.connect(peer_addr).await?;
-
             let mut conn_record = ConnectRecord {
                 result: ConnectResult::Unknown,
                 protocol: ConnectMethod::UDP,
@@ -110,20 +105,28 @@ impl UdpClient {
                 time: -1.0,
             };
 
-            if self.ping_options.nk_peer_messaging {
-                let mut nk_msg = NetKrakenMessage::new(
-                    &uuid.to_string(),
-                    &writer.local_addr()?.to_string(),
-                    &peer_addr.to_string(),
-                    ConnectMethod::UDP,
-                )?;
-                nk_msg.uuid = uuid.to_string();
+            // record timestamp before connection
+            let pre_conn_timestamp = time_now_us()?;
+            send_count += 1;
+            writer.connect(peer_addr).await?;
 
-                let payload = serde_json::to_string(&nk_msg)?;
+            match self.ping_options.nk_peer_messaging {
+                false => {
+                    writer.send(PING_MSG.as_bytes()).await?;
+                }
+                true => {
+                    let mut nk_msg = NetKrakenMessage::new(
+                        &uuid.to_string(),
+                        &writer.local_addr()?.to_string(),
+                        &peer_addr.to_string(),
+                        ConnectMethod::UDP,
+                    )?;
+                    nk_msg.uuid = uuid.to_string();
 
-                writer.send(payload.as_bytes()).await?;
-            } else {
-                writer.send(PING_MSG.as_bytes()).await?;
+                    let payload = serde_json::to_string(&nk_msg)?;
+
+                    writer.send(payload.as_bytes()).await?;
+                }
             }
 
             // Wait for a reply

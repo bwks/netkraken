@@ -12,15 +12,15 @@ use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 
 pub struct TcpServer {
-    pub listen_addr: String,
+    pub listen_ip: String,
     pub listen_port: u16,
     pub output_options: OutputOptions,
 }
 
 impl TcpServer {
     pub async fn listen(&self) -> Result<()> {
-        let listen_addr = parse_ipaddr(&self.listen_addr)?;
-        let bind_addr = format!("{}:{}", listen_addr, self.listen_port);
+        let listen_ip = parse_ipaddr(&self.listen_ip)?;
+        let bind_addr = format!("{}:{}", listen_ip, self.listen_port);
 
         let listener = TcpListener::bind(&bind_addr).await?;
 
@@ -82,7 +82,7 @@ impl TcpServer {
 impl Default for TcpServer {
     fn default() -> Self {
         Self {
-            listen_addr: BIND_ADDR.to_owned(),
+            listen_ip: BIND_ADDR.to_owned(),
             listen_port: BIND_PORT,
             output_options: OutputOptions::default(),
         }
