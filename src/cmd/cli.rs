@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 
-use crate::core::common::{ConnectMethod, OutputOptions, PingOptions};
+use crate::core::common::{ConnectMethod, ListenOptions, OutputOptions, PingOptions};
 use crate::core::konst::{LOGFILE_DIR, LOGFILE_NAME};
 use crate::tcp::client::TcpClient;
 use crate::tcp::server::TcpServer;
@@ -96,6 +96,9 @@ impl Cli {
         ping_options.timeout = cli.timeout;
         ping_options.nk_peer_messaging = cli.nk_peer;
 
+        let mut listen_options = ListenOptions::default();
+        listen_options.nk_peer_messaging = cli.nk_peer;
+
         let mut output_options = OutputOptions::default();
         output_options.json = cli.json;
         output_options.quiet = cli.quiet;
@@ -110,6 +113,7 @@ impl Cli {
                         listen_ip: cli.dst_host,
                         listen_port: cli.dst_port,
                         output_options,
+                        listen_options,
                     };
                     tcp_server.listen().await?;
                 } else {
@@ -130,6 +134,7 @@ impl Cli {
                         listen_ip: cli.dst_host,
                         listen_port: cli.dst_port,
                         output_options,
+                        listen_options,
                     };
                     udp_server.listen().await?;
                 } else {

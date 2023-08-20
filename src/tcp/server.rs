@@ -4,7 +4,7 @@ use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 
-use crate::core::common::{ConnectMethod, ConnectResult, LogLevel, OutputOptions};
+use crate::core::common::{ConnectMethod, ConnectResult, ListenOptions, LogLevel, OutputOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::output_handler;
 use crate::util::message::{server_conn_success_msg, server_start_msg};
@@ -15,6 +15,7 @@ pub struct TcpServer {
     pub listen_ip: String,
     pub listen_port: u16,
     pub output_options: OutputOptions,
+    pub listen_options: ListenOptions,
 }
 
 impl TcpServer {
@@ -29,6 +30,7 @@ impl TcpServer {
 
         loop {
             let output_options = self.output_options;
+            let listen_options = self.listen_options;
             // Receive stream
             let (mut stream, _) = listener.accept().await?;
 
@@ -42,7 +44,7 @@ impl TcpServer {
                 let len = reader.read(&mut buffer).await?;
                 buffer.truncate(len);
                 let mut client_server_time = 0.0;
-                if len > 0 {
+                if listen_options.nk_peer_messaging && len > 0 {
                     // Discover NetKracken peer.
                     let data_string = &String::from_utf8_lossy(&buffer);
                     match nk_msg_reader(&data_string) {
@@ -85,6 +87,7 @@ impl Default for TcpServer {
             listen_ip: BIND_ADDR.to_owned(),
             listen_port: BIND_PORT,
             output_options: OutputOptions::default(),
+            listen_options: ListenOptions::default(),
         }
     }
 }

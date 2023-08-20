@@ -92,7 +92,20 @@ impl Default for PingOptions {
             repeat: 4,
             interval: 1000,
             timeout: 1000,
-            nk_peer_messaging: true,
+            nk_peer_messaging: false,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub struct ListenOptions {
+    pub nk_peer_messaging: bool,
+}
+
+impl Default for ListenOptions {
+    fn default() -> Self {
+        Self {
+            nk_peer_messaging: false,
         }
     }
 }

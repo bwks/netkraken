@@ -4,7 +4,7 @@ use anyhow::Result;
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 
-use crate::core::common::{ConnectMethod, ConnectResult, LogLevel, OutputOptions};
+use crate::core::common::{ConnectMethod, ConnectResult, ListenOptions, LogLevel, OutputOptions};
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::output_handler;
 use crate::util::message::{server_conn_success_msg, server_start_msg};
@@ -15,6 +15,7 @@ pub struct UdpServer {
     pub listen_ip: String,
     pub listen_port: u16,
     pub output_options: OutputOptions,
+    pub listen_options: ListenOptions,
 }
 
 impl UdpServer {
@@ -61,7 +62,7 @@ impl UdpServer {
             // Add echo handler
             let mut client_server_time = 0.0;
 
-            if len > 0 {
+            if self.listen_options.nk_peer_messaging && len > 0 {
                 let data_string = &String::from_utf8_lossy(&buffer);
 
                 match nk_msg_reader(&data_string) {
@@ -102,6 +103,7 @@ impl Default for UdpServer {
             listen_ip: BIND_ADDR.to_owned(),
             listen_port: BIND_PORT,
             output_options: OutputOptions::default(),
+            listen_options: ListenOptions::default(),
         }
     }
 }
