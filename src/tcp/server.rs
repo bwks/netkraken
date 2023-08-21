@@ -5,7 +5,6 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 
 use crate::core::common::{ConnectMethod, ConnectResult, ListenOptions, LogLevel, OutputOptions};
-use crate::core::konst::PING_MSG;
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::output_handler;
 use crate::util::message::{server_conn_success_msg, server_start_msg};
