@@ -5,6 +5,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 
 use crate::core::common::{ConnectMethod, ConnectResult, ListenOptions, LogLevel, OutputOptions};
+use crate::core::konst::PING_MSG;
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::output_handler;
 use crate::util::message::{server_conn_success_msg, server_start_msg};
@@ -44,25 +45,31 @@ impl TcpServer {
                 let len = reader.read(&mut buffer).await?;
                 buffer.truncate(len);
                 let mut client_server_time = 0.0;
-                if listen_options.nk_peer_messaging && len > 0 {
-                    // Discover NetKracken peer.
-                    let data_string = &String::from_utf8_lossy(&buffer);
-                    match nk_msg_reader(&data_string) {
-                        Some(mut m) => {
-                            let connection_time =
-                                calc_connect_ms(m.send_timestamp, receive_time_stamp);
-                            client_server_time = connection_time;
 
-                            m.receive_time_utc = receive_time_utc;
-                            m.receive_timestamp = receive_time_stamp;
-                            m.one_way_time_ms = connection_time;
+                match listen_options.nk_peer_messaging && len > 0 {
+                    false => {
+                        writer.write_all(&buffer).await?;
+                    }
+                    true => {
+                        let data_string = &String::from_utf8_lossy(&buffer);
+                        match nk_msg_reader(&data_string) {
+                            Some(mut m) => {
+                                let connection_time =
+                                    calc_connect_ms(m.send_timestamp, receive_time_stamp);
+                                client_server_time = connection_time;
 
-                            let json_message = serde_json::to_string(&m)?;
-                            writer.write_all(json_message.as_bytes()).await?;
+                                m.receive_time_utc = receive_time_utc;
+                                m.receive_timestamp = receive_time_stamp;
+                                m.one_way_time_ms = connection_time;
+
+                                let json_message = serde_json::to_string(&m)?;
+                                writer.write_all(json_message.as_bytes()).await?;
+                            }
+                            None => writer.write_all(data_string.as_bytes()).await?,
                         }
-                        None => writer.write_all(data_string.as_bytes()).await?,
                     }
                 }
+
                 let msg = server_conn_success_msg(
                     ConnectResult::Ping,
                     ConnectMethod::TCP,

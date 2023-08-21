@@ -62,29 +62,34 @@ impl UdpServer {
             // Add echo handler
             let mut client_server_time = 0.0;
 
-            if self.listen_options.nk_peer_messaging && len > 0 {
-                let data_string = &String::from_utf8_lossy(&buffer);
-
-                match nk_msg_reader(&data_string) {
-                    Some(mut m) => {
-                        let connection_time = calc_connect_ms(m.send_timestamp, receive_time_stamp);
-                        client_server_time = connection_time;
-
-                        m.receive_time_utc = receive_time_utc;
-                        m.receive_timestamp = receive_time_stamp;
-                        m.one_way_time_ms = connection_time;
-                        m.nk_peer = true;
-
-                        let json_message = serde_json::to_string(&m)?;
-                        tx_chan
-                            .send((json_message.as_bytes().to_vec(), addr))
-                            .await?;
-                    }
-                    None => tx_chan.send((buffer.clone(), addr)).await?,
+            match self.listen_options.nk_peer_messaging && len > 0 {
+                false => {
+                    tx_chan.send((buffer.clone(), addr)).await?;
                 }
-            } else {
-                tx_chan.send((buffer.clone(), addr)).await?
+                true => {
+                    let data_string = &String::from_utf8_lossy(&buffer);
+
+                    match nk_msg_reader(&data_string) {
+                        Some(mut m) => {
+                            let connection_time =
+                                calc_connect_ms(m.send_timestamp, receive_time_stamp);
+                            client_server_time = connection_time;
+
+                            m.receive_time_utc = receive_time_utc;
+                            m.receive_timestamp = receive_time_stamp;
+                            m.one_way_time_ms = connection_time;
+                            m.nk_peer = true;
+
+                            let json_message = serde_json::to_string(&m)?;
+                            tx_chan
+                                .send((json_message.as_bytes().to_vec(), addr))
+                                .await?;
+                        }
+                        None => tx_chan.send((buffer.clone(), addr)).await?,
+                    }
+                }
             }
+
             let msg = server_conn_success_msg(
                 ConnectResult::Ping,
                 ConnectMethod::UDP,
