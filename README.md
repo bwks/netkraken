@@ -2,7 +2,7 @@
 
 NetKraken is a Network connectivity tester inspired by `nc`, `ncat` and the `netcat`s 
 of the world. 
-
+ git status
 Goals:
  - Cross platform support, with Windows as a first class citizen
  - Async
