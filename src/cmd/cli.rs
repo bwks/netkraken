@@ -90,19 +90,21 @@ impl Cli {
         println!("{header_msg}");
         let cli = Cli::parse();
 
-        let mut ping_options = PingOptions::default();
-        ping_options.repeat = cli.repeat;
-        ping_options.interval = cli.interval;
-        ping_options.timeout = cli.timeout;
-        ping_options.nk_peer_messaging = cli.nk_peer;
+        let ping_options = PingOptions {
+            repeat: cli.repeat,
+            interval: cli.interval,
+            timeout: cli.timeout,
+            nk_peer_messaging: cli.nk_peer,
+        };
 
-        let mut listen_options = ListenOptions::default();
-        listen_options.nk_peer_messaging = cli.nk_peer;
-
-        let mut output_options = OutputOptions::default();
-        output_options.json = cli.json;
-        output_options.quiet = cli.quiet;
-        output_options.syslog = cli.syslog;
+        let listen_options = ListenOptions {
+            nk_peer_messaging: cli.nk_peer,
+        };
+        let output_options = OutputOptions {
+            json: cli.json,
+            quiet: cli.quiet,
+            syslog: cli.syslog,
+        };
 
         match cli.method {
             ConnectMethod::HTTP => println!("http not implemented"),

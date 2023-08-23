@@ -20,9 +20,7 @@ async fn main() -> ExitCode {
     let (logfile, _guard) = tracing_appender::non_blocking(file_appender);
 
     let tracer = tracing_subscriber::fmt()
-        .with_env_filter(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| format!("{APP_NAME}=info").into()),
-        )
+        .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| format!("{APP_NAME}=info")))
         .with_writer(logfile)
         .with_ansi(false);
 

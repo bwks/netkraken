@@ -32,6 +32,7 @@ impl Display for ConnectResult {
     }
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(ValueEnum, Copy, Clone, Debug, Default, Serialize)]
 pub enum ConnectMethod {
     #[default]
@@ -52,7 +53,7 @@ impl Display for ConnectMethod {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code, clippy::upper_case_acronyms)]
 pub enum LogLevel {
     DEBUG,
     ERROR,
@@ -61,21 +62,11 @@ pub enum LogLevel {
     TRACE,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct OutputOptions {
     pub quiet: bool,
     pub json: bool,
     pub syslog: bool,
-}
-
-impl Default for OutputOptions {
-    fn default() -> Self {
-        Self {
-            quiet: false,
-            json: false,
-            syslog: false,
-        }
-    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -97,17 +88,9 @@ impl Default for PingOptions {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct ListenOptions {
     pub nk_peer_messaging: bool,
-}
-
-impl Default for ListenOptions {
-    fn default() -> Self {
-        Self {
-            nk_peer_messaging: false,
-        }
-    }
 }
 
 #[derive(Serialize)]
@@ -142,7 +125,7 @@ impl ConnectRecord {
     pub fn client_success_msg(&self) -> String {
         format!(
             "{} => proto={} src={} dst={} time={:.3}ms",
-            self.result.to_string(),
+            self.result,
             self.protocol.to_string().to_uppercase(),
             self.source,
             self.destination,

@@ -51,7 +51,7 @@ impl TcpServer {
                     }
                     true => {
                         let data_string = &String::from_utf8_lossy(&buffer);
-                        match nk_msg_reader(&data_string) {
+                        match nk_msg_reader(data_string) {
                             Some(mut m) => {
                                 let connection_time =
                                     calc_connect_ms(m.send_timestamp, receive_time_stamp);

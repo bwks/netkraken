@@ -42,14 +42,12 @@ impl UdpServer {
             let mut buffer = vec![0u8; MAX_PACKET_SIZE];
             let (len, addr) = match reader.recv_from(&mut buffer).await {
                 Ok((len, addr)) => (len, addr),
-                Err(e) => match e.kind() {
-                    _ => {
-                        // Received some kind of connection error
-                        // known errors: ConnectionRest by peer
-                        println!("{}", e.kind().to_string());
-                        continue;
-                    }
-                },
+                Err(e) => {
+                    // Received some kind of connection error
+                    // known errors: ConnectionRest by peer
+                    println!("{}", e.kind());
+                    continue;
+                }
             };
 
             buffer.truncate(len);
@@ -69,7 +67,7 @@ impl UdpServer {
                 true => {
                     let data_string = &String::from_utf8_lossy(&buffer);
 
-                    match nk_msg_reader(&data_string) {
+                    match nk_msg_reader(data_string) {
                         Some(mut m) => {
                             let connection_time =
                                 calc_connect_ms(m.send_timestamp, receive_time_stamp);

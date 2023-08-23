@@ -19,14 +19,14 @@ use crate::core::konst::APP_NAME;
 pub async fn loop_handler(loop_count: u16, num_repeats: u16, sleep_interval: u16) -> bool {
     if loop_count == u16::MAX {
         println!("max ping count reached");
-        return true;
+        true
     } else if num_repeats != 0 && loop_count >= num_repeats {
-        return true;
+        true
     } else {
         if loop_count > 0 {
             sleep(Duration::from_millis(sleep_interval.into())).await;
         }
-        return false;
+        false
     }
 }
 
