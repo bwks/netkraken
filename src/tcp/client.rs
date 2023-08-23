@@ -120,7 +120,7 @@ impl TcpClient {
                     Err(e) => {
                         output_handler(
                             LogLevel::ERROR,
-                            &conn_record.client_error_msg(e.into()),
+                            &conn_record.client_error_msg(e),
                             &self.output_options,
                         )
                         .await;
@@ -161,8 +161,8 @@ impl TcpClient {
                 true => {
                     let mut nk_msg = NetKrakenMessage::new(
                         &uuid.to_string(),
-                        &local_addr,
-                        &peer_addr,
+                        local_addr,
+                        peer_addr,
                         ConnectMethod::TCP,
                     )?;
                     nk_msg.uuid = uuid.to_string();
@@ -184,7 +184,7 @@ impl TcpClient {
                     if self.ping_options.nk_peer_messaging && len > 0 {
                         let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
-                        if let Some(mut m) = nk_msg_reader(&data_string) {
+                        if let Some(mut m) = nk_msg_reader(data_string) {
                             m.round_trip_time_utc = time_now_utc();
                             m.round_trip_timestamp = time_now_us()?;
                             m.round_trip_time_ms = connection_time;

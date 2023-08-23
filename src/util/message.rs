@@ -2,7 +2,7 @@ use crate::core::common::{ClientSummary, ConnectMethod, ConnectResult};
 
 /// Return the CLI header message
 pub fn cli_header_msg() -> String {
-    format!("NetKraken - Cross platform network connectivity tester\n")
+    "NetKraken - Cross platform network connectivity tester\n".to_string()
 }
 
 /// Return server start message
@@ -74,11 +74,11 @@ pub fn server_conn_success_msg(
     destination: &String,
     time: f64,
 ) -> String {
-    let msg = match time == 0.0 {
+    match time == 0.0 {
         true => {
             format!(
                 "{} => proto={} src={} dst={}",
-                result.to_string(),
+                result,
                 protocol.to_string().to_uppercase(),
                 source,
                 destination,
@@ -87,15 +87,14 @@ pub fn server_conn_success_msg(
         false => {
             format!(
                 "{} => proto={} src={} dst={} time={:.3}ms",
-                result.to_string(),
+                result,
                 protocol.to_string().to_uppercase(),
                 source,
                 destination,
                 time,
             )
         }
-    };
-    msg
+    }
 }
 
 /// Calculate the percentage of loss between the

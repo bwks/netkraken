@@ -6,7 +6,7 @@ use crate::core::common::NetKrakenMessage;
 
 /// Parse into a std::net::IPv4 or std::net::IPv6 address from a string
 pub fn parse_ipaddr(s: &String) -> Result<IpAddr> {
-    if !s.contains(".") && !s.contains(":") {
+    if !s.contains('.') && !s.contains(':') {
         bail!("source address: `{s}` is invalid")
     }
 

@@ -153,7 +153,7 @@ impl UdpClient {
                             let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
                             // Handle connection to a NetKraken peer
-                            if let Some(mut m) = nk_msg_reader(&data_string) {
+                            if let Some(mut m) = nk_msg_reader(data_string) {
                                 m.round_trip_time_utc = time_now_utc();
                                 m.round_trip_timestamp = time_now_us()?;
                                 m.round_trip_time_ms = connection_time;
