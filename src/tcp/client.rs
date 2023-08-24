@@ -13,7 +13,7 @@ use crate::core::common::{
     ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, LogLevel, NetKrakenMessage,
     OutputOptions, PingOptions,
 };
-use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE, PING_MSG};
+use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::{loop_handler, output_handler};
 use crate::util::message::{client_summary_msg, ping_header_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
@@ -81,7 +81,6 @@ impl TcpClient {
         let c = cancel.clone();
         tokio::spawn(async move {
             signal::ctrl_c().await.unwrap();
-            // Your handler here
             c.store(true, Ordering::SeqCst);
         });
 
@@ -138,6 +137,7 @@ impl TcpClient {
                     continue;
                 }
             };
+
             // Record timestamp after connection
             let post_conn_timestamp = time_now_us()?;
 
@@ -152,53 +152,48 @@ impl TcpClient {
             conn_record.time = connection_time;
             latencies.push(connection_time);
 
-            let (mut reader, mut writer) = stream.split();
+            // Only send payload with NetKraken peers
+            if self.ping_options.nk_peer_messaging {
+                let (mut reader, mut writer) = stream.split();
+                let mut nk_msg = NetKrakenMessage::new(
+                    &uuid.to_string(),
+                    local_addr,
+                    peer_addr,
+                    ConnectMethod::TCP,
+                )?;
+                nk_msg.uuid = uuid.to_string();
 
-            match self.ping_options.nk_peer_messaging {
-                false => {
-                    writer.write_all(PING_MSG.as_bytes()).await?;
-                }
-                true => {
-                    let mut nk_msg = NetKrakenMessage::new(
-                        &uuid.to_string(),
-                        local_addr,
-                        peer_addr,
-                        ConnectMethod::TCP,
-                    )?;
-                    nk_msg.uuid = uuid.to_string();
+                let payload = nk_msg.to_json()?;
 
-                    let payload = nk_msg.to_json()?;
+                // Send payload to peer
+                writer.write_all(payload.as_bytes()).await?;
 
-                    // Send payload to peer
-                    writer.write_all(payload.as_bytes()).await?;
-                }
-            }
+                writer.shutdown().await?;
 
-            writer.shutdown().await?;
+                // Wait for reply
+                let mut buffer = vec![0u8; MAX_PACKET_SIZE];
 
-            // Wait for reply
-            let mut buffer = vec![0u8; MAX_PACKET_SIZE];
+                match reader.read_to_end(&mut buffer).await {
+                    Ok(len) => {
+                        if self.ping_options.nk_peer_messaging && len > 0 {
+                            let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
-            match reader.read_to_end(&mut buffer).await {
-                Ok(len) => {
-                    if self.ping_options.nk_peer_messaging && len > 0 {
-                        let data_string = &String::from_utf8_lossy(&buffer[..len]);
-
-                        if let Some(mut m) = nk_msg_reader(data_string) {
-                            m.round_trip_time_utc = time_now_utc();
-                            m.round_trip_timestamp = time_now_us()?;
-                            m.round_trip_time_ms = connection_time;
+                            if let Some(mut m) = nk_msg_reader(data_string) {
+                                m.round_trip_time_utc = time_now_utc();
+                                m.round_trip_timestamp = time_now_us()?;
+                                m.round_trip_time_ms = connection_time;
+                            }
+                            // TODO: Do something with nk message
                         }
-                        // TODO: Do something with nk message
                     }
-                }
-                Err(e) => {
-                    output_handler(
-                        LogLevel::ERROR,
-                        &conn_record.client_error_msg(e),
-                        &self.output_options,
-                    )
-                    .await;
+                    Err(e) => {
+                        output_handler(
+                            LogLevel::ERROR,
+                            &conn_record.client_error_msg(e),
+                            &self.output_options,
+                        )
+                        .await;
+                    }
                 }
             }
 
