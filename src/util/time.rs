@@ -4,10 +4,15 @@ use anyhow::Result;
 use time::OffsetDateTime;
 
 /// Get the current unix timestamp in microseconds
-pub fn time_now_us() -> Result<u128> {
+pub fn time_now_us() -> u128 {
     let start = SystemTime::now();
-    let since_the_epoch = start.duration_since(UNIX_EPOCH)?;
-    Ok(since_the_epoch.as_micros())
+    // This should never fail. It should be impossible for the
+    // systemtime to be less than the unix epoch in any well behaved
+    // modern system.
+    let since_the_epoch = start
+        .duration_since(UNIX_EPOCH)
+        .expect("SYSTEM CLOCK IS BROKEN - FIX YOUR SHIT");
+    since_the_epoch.as_micros()
 }
 
 /// Get the current UTC date and time as a string

@@ -103,10 +103,11 @@ impl UdpClient {
                 source: writer.local_addr()?.to_string().to_owned(),
                 destination: peer_addr.to_string().to_owned(),
                 time: -1.0,
+                error_msg: None,
             };
 
             // record timestamp before connection
-            let pre_conn_timestamp = time_now_us()?;
+            let pre_conn_timestamp = time_now_us();
             send_count += 1;
             writer.connect(peer_addr).await?;
 
@@ -139,7 +140,7 @@ impl UdpClient {
                         received_count += 1;
 
                         // Record timestamp after connection
-                        let post_conn_timestamp = time_now_us()?;
+                        let post_conn_timestamp = time_now_us();
 
                         // Calculate the round trip time
                         let connection_time =
@@ -155,7 +156,7 @@ impl UdpClient {
                             // Handle connection to a NetKraken peer
                             if let Some(mut m) = nk_msg_reader(data_string) {
                                 m.round_trip_time_utc = time_now_utc();
-                                m.round_trip_timestamp = time_now_us()?;
+                                m.round_trip_timestamp = time_now_us();
                                 m.round_trip_time_ms = connection_time;
 
                                 // TODO: Do something with nk message
