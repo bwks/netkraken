@@ -17,10 +17,9 @@ Press CRTL+C to exit
 }
 
 /// Return a ping header message
-pub fn ping_header_msg(source: &String, destination: &String, protocol: ConnectMethod) -> String {
+pub fn ping_header_msg(destination: &String, protocol: ConnectMethod) -> String {
     format!(
-        "Connecting from {} to {} via {}",
-        source,
+        "Connecting to {} via {}",
         destination,
         protocol.to_string().to_uppercase(),
     )
@@ -110,13 +109,9 @@ mod tests {
 
     #[test]
     fn ping_header_msg_is_expected() {
-        let msg = ping_header_msg(
-            &"0.0.0.0:0".to_owned(),
-            &"198.51.100.1:443".to_owned(),
-            ConnectMethod::TCP,
-        );
+        let msg = ping_header_msg(&"198.51.100.1:443".to_owned(), ConnectMethod::TCP);
 
-        assert_eq!(msg, "Connecting from 0.0.0.0:0 to 198.51.100.1:443 via TCP");
+        assert_eq!(msg, "Connecting to 198.51.100.1:443 via TCP");
     }
 
     #[test]

@@ -68,11 +68,7 @@ impl UdpClient {
         let mut received_count: u16 = 0;
         let mut latencies: Vec<f64> = Vec::new();
 
-        let ping_header = ping_header_msg(
-            &bind_addr.to_string(),
-            &peer_addr.to_string(),
-            ConnectMethod::UDP,
-        );
+        let ping_header = ping_header_msg(&peer_addr.to_string(), ConnectMethod::UDP);
         println!("{ping_header}");
 
         let cancel = Arc::new(AtomicBool::new(false));
