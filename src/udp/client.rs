@@ -99,6 +99,7 @@ impl UdpClient {
                 source: writer.local_addr()?.to_string().to_owned(),
                 destination: peer_addr.to_string().to_owned(),
                 time: -1.0,
+                success: false,
                 error_msg: None,
             };
 

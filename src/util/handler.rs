@@ -58,11 +58,9 @@ pub async fn output_handler2(
         println!("{message}");
     }
     if output_options.syslog {
-        match record.result {
-            ConnectResult::Ping | ConnectResult::Pong => {
-                event!(target: APP_NAME, Level::INFO, "{message}")
-            }
-            _ => event!(target: APP_NAME, Level::ERROR, "{message}"),
+        match record.success {
+            true => event!(target: APP_NAME, Level::INFO, "{message}"),
+            false => event!(target: APP_NAME, Level::ERROR, "{message}"),
         };
     }
     if output_options.json {

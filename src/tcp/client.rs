@@ -84,7 +84,6 @@ impl TcpClient {
         };
 
         let host_records = HostRecord::new(&self.dst_ip, self.dst_port).await;
-        println!("{}", host_records);
 
         let hosts = vec![host_records.clone()];
 
@@ -99,9 +98,15 @@ impl TcpClient {
             .collect()
             .await;
 
-        println!("{:#?}", lookup_data);
-
-        let connect_addr = host_records.ipv4_sockets[0];
+        for lookup in lookup_data.clone() {
+            println!("{} resolves to:", lookup.host);
+            for addr in lookup.ipv4_sockets {
+                println!("{}", addr.ip())
+            }
+            for addr in lookup.ipv6_sockets {
+                println!("{}", addr.ip())
+            }
+        }
 
         let uuid = Uuid::new_v4();
         let mut count: u16 = 0;
@@ -110,7 +115,7 @@ impl TcpClient {
         let mut received_count: u16 = 0;
         let mut latencies: Vec<f64> = Vec::new();
 
-        let ping_header = ping_header_msg(&connect_addr.to_string(), ConnectMethod::TCP);
+        let ping_header = ping_header_msg(&self.dst_ip, ConnectMethod::TCP);
         println!("{ping_header}");
 
         let cancel = Arc::new(AtomicBool::new(false));
@@ -143,7 +148,6 @@ impl TcpClient {
 
             host_results.sort_by_key(|h| h.host.to_owned());
             for host in host_results {
-                println!("{} ->", host.host);
                 for result in host.results {
                     let success_msg = client_result_msg(&result);
                     output_handler2(&result, &success_msg, &self.output_options).await;
@@ -158,11 +162,7 @@ impl TcpClient {
             received_count,
             latencies,
         };
-        let summary_msg = client_summary_msg(
-            &connect_addr.to_string(),
-            ConnectMethod::TCP,
-            client_summary,
-        );
+        let summary_msg = client_summary_msg(&self.dst_ip, ConnectMethod::TCP, client_summary);
         println!("{}", summary_msg);
 
         Ok(())
@@ -213,17 +213,18 @@ async fn connect_host(
         .unwrap_or_else(|_| panic!("ERROR GETTING TCP SOCKET LOCAL ADDRESS"))
         .to_string();
 
-    // record timestamp before connection
-    let pre_conn_timestamp = time_now_us();
-
     let mut conn_record = ConnectRecord {
         result: ConnectResult::Unknown,
         protocol: ConnectMethod::TCP,
         source: local_addr,
         destination: dst_socket.to_string(),
         time: -1.0,
+        success: false,
         error_msg: None,
     };
+
+    // record timestamp before connection
+    let pre_conn_timestamp = time_now_us();
 
     let tick = Duration::from_millis(ping_options.timeout.into());
     match timeout(tick, src_socket.connect(dst_socket)).await {
@@ -240,6 +241,7 @@ async fn connect_host(
                     // we should have always have a local address.
                     .unwrap_or_else(|_| panic!("ERROR GETTING TCP STREAM LOCAL ADDRESS"))
                     .to_string();
+                conn_record.success = true;
                 conn_record.result = ConnectResult::Pong;
                 conn_record.time = connection_time;
             }

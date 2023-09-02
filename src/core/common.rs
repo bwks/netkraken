@@ -101,6 +101,7 @@ pub struct ConnectRecord {
     pub source: String,
     pub destination: String,
     pub time: f64,
+    pub success: bool,
     pub error_msg: Option<String>, // Original error message
 }
 
