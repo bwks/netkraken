@@ -99,7 +99,13 @@ impl TcpClient {
             .collect()
             .await;
 
+        let mut resolved_hosts: Vec<HostRecord> = vec![];
         for lookup in lookup_data.clone() {
+            if lookup.ipv4_sockets.is_empty() && lookup.ipv6_sockets.is_empty() {
+                println!("{} returned no IPs", lookup.host);
+                continue;
+            }
+            resolved_hosts.push(lookup.clone());
             println!(
                 "{} resolves to {} IPs",
                 lookup.host,
@@ -148,7 +154,7 @@ impl TcpClient {
                 false => count += 1,
             }
 
-            let mut host_results: Vec<HostResults> = futures::stream::iter(lookup_data.clone())
+            let mut host_results: Vec<HostResults> = futures::stream::iter(resolved_hosts.clone())
                 .map(|host_record| {
                     let src_ip_port = src_ip_port.clone();
                     async move {
