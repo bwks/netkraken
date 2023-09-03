@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -11,12 +12,12 @@ use tokio::time::{timeout, Duration};
 use uuid::Uuid;
 
 use crate::core::common::{
-    ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, LogLevel,
+    ClientSummary2, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, LogLevel,
     NetKrakenMessage, OutputOptions, PingOptions,
 };
 use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::{loop_handler, output_handler, output_handler2};
-use crate::util::message::{client_summary_msg, ping_header_msg};
+use crate::util::message::{client_summary_msg2, ping_header_msg, ping_header_msg2};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 
@@ -78,6 +79,13 @@ impl TcpClient {
     }
 
     pub async fn connect(&self) -> Result<()> {
+        // {
+        //  host: {
+        //      ip: []
+        //      }
+        // }
+        let mut results_map: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::new();
+
         let src_ip_port = IpPort {
             ip: parse_ipaddr(&self.src_ip)?,
             port: self.src_port,
@@ -99,14 +107,32 @@ impl TcpClient {
             .await;
 
         for lookup in lookup_data.clone() {
-            println!("{} resolves to:", lookup.host);
+            println!(
+                "{} resolves to {} IPs",
+                lookup.host,
+                lookup.ipv4_sockets.len() + lookup.ipv6_sockets.len()
+            );
+            results_map.insert(lookup.host.to_owned(), HashMap::new());
             for addr in lookup.ipv4_sockets {
-                println!("{}", addr.ip())
+                println!(" - {}", addr.ip());
+                results_map
+                    .get_mut(&lookup.host)
+                    // this should never fail because we just inserted lookup.host
+                    .unwrap()
+                    .insert(addr.to_string(), vec![]);
             }
             for addr in lookup.ipv6_sockets {
-                println!("{}", addr.ip())
+                println!("{}", addr.ip());
+                results_map
+                    .get_mut(&lookup.host)
+                    // this should never fail because we just inserted lookup.host
+                    .unwrap()
+                    .insert(addr.to_string(), vec![]);
             }
+            println!();
         }
+
+        // println!("{:#?}", results_map);
 
         let uuid = Uuid::new_v4();
         let mut count: u16 = 0;
@@ -115,7 +141,7 @@ impl TcpClient {
         let mut received_count: u16 = 0;
         let mut latencies: Vec<f64> = Vec::new();
 
-        let ping_header = ping_header_msg(&self.dst_ip, ConnectMethod::TCP);
+        let ping_header = ping_header_msg2(&self.dst_ip, self.dst_port, ConnectMethod::TCP);
         println!("{ping_header}");
 
         let cancel = Arc::new(AtomicBool::new(false));
@@ -149,6 +175,13 @@ impl TcpClient {
             host_results.sort_by_key(|h| h.host.to_owned());
             for host in host_results {
                 for result in host.results {
+                    results_map
+                        .get_mut(&host.host)
+                        .unwrap()
+                        .get_mut(&result.destination)
+                        .unwrap()
+                        .push(result.time);
+
                     let success_msg = client_result_msg(&result);
                     output_handler2(&result, &success_msg, &self.output_options).await;
                 }
@@ -157,13 +190,18 @@ impl TcpClient {
             send_count += 1;
         }
 
-        let client_summary = ClientSummary {
-            send_count,
-            received_count,
-            latencies,
-        };
-        let summary_msg = client_summary_msg(&self.dst_ip, ConnectMethod::TCP, client_summary);
-        println!("{}", summary_msg);
+        // println!("{:#?}", results_map);
+
+        for (_, addrs) in results_map {
+            for (addr, latencies) in addrs {
+                let client_summary = ClientSummary2 {
+                    send_count,
+                    latencies,
+                };
+                let summary_msg = client_summary_msg2(&addr, ConnectMethod::TCP, client_summary);
+                println!("{}", summary_msg);
+            }
+        }
 
         Ok(())
     }
@@ -244,6 +282,9 @@ async fn connect_host(
                 conn_record.success = true;
                 conn_record.result = ConnectResult::Pong;
                 conn_record.time = connection_time;
+
+                // TODO:
+                // send/receive nk message
             }
             // Connection timeout
             Err(e) => {

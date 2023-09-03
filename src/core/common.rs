@@ -107,18 +107,26 @@ pub struct ConnectRecord {
 
 impl Display for ConnectRecord {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let error_msg = match &self.error_msg {
+            Some(m) => m.to_owned(),
+            None => "".to_owned(),
+        };
         let msg = format!(
             "result: {}
 protocol: {}
 source: {}
 destination: {}
 time: {:.3}
+success: {}
+error: {}
 ",
             self.result,
             self.protocol.to_string().to_uppercase(),
             self.source,
             self.destination,
-            self.time
+            self.time,
+            self.success,
+            error_msg,
         );
         write!(f, "{msg}")
     }
@@ -156,6 +164,10 @@ impl ConnectRecord {
 pub struct ClientSummary {
     pub send_count: u16,
     pub received_count: u16,
+    pub latencies: Vec<f64>,
+}
+pub struct ClientSummary2 {
+    pub send_count: u16,
     pub latencies: Vec<f64>,
 }
 
