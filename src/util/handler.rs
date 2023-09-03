@@ -2,9 +2,9 @@ use tokio::time::{sleep, Duration};
 use tracing::event;
 use tracing::Level;
 
+use crate::core::common::ConnectRecord;
 use crate::core::common::LogLevel;
 use crate::core::common::OutputOptions;
-use crate::core::common::{ConnectRecord, ConnectResult};
 use crate::core::konst::APP_NAME;
 
 /// Handler to manage loop iterations. On `true` the loop

@@ -209,7 +209,7 @@ impl NetKrakenMessage {
         Ok(message)
     }
 
-    pub fn to_json(&self) -> Result<String> {
+    pub fn _to_json(&self) -> Result<String> {
         let json_string = serde_json::to_string(&self)?;
         Ok(json_string)
     }

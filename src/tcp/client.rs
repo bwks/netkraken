@@ -5,21 +5,19 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use futures::StreamExt;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::{TcpSocket, TcpStream};
+use tokio::net::TcpSocket;
 use tokio::signal;
 use tokio::time::{timeout, Duration};
-use uuid::Uuid;
 
 use crate::core::common::{
-    ClientSummary2, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, LogLevel,
-    NetKrakenMessage, OutputOptions, PingOptions,
+    ClientSummary2, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, OutputOptions,
+    PingOptions,
 };
-use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
-use crate::util::handler::{loop_handler, output_handler, output_handler2};
-use crate::util::message::{client_summary_msg2, ping_header_msg, ping_header_msg2};
-use crate::util::parser::{nk_msg_reader, parse_ipaddr};
-use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
+use crate::core::konst::{BIND_ADDR, BIND_PORT};
+use crate::util::handler::{loop_handler, output_handler2};
+use crate::util::message::{client_summary_msg2, ping_header_msg2};
+use crate::util::parser::parse_ipaddr;
+use crate::util::time::{calc_connect_ms, time_now_us};
 
 const BUFFER_SIZE: usize = 100;
 
@@ -79,11 +77,6 @@ impl TcpClient {
     }
 
     pub async fn connect(&self) -> Result<()> {
-        // {
-        //  host: {
-        //      ip: []
-        //      }
-        // }
         let mut results_map: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::new();
 
         let src_ip_port = IpPort {
@@ -122,7 +115,7 @@ impl TcpClient {
                     .insert(addr.to_string(), vec![]);
             }
             for addr in lookup.ipv6_sockets {
-                println!("{}", addr.ip());
+                println!(" - {}", addr.ip());
                 results_map
                     .get_mut(&lookup.host)
                     // this should never fail because we just inserted lookup.host
@@ -132,14 +125,9 @@ impl TcpClient {
             println!();
         }
 
-        // println!("{:#?}", results_map);
-
-        let uuid = Uuid::new_v4();
         let mut count: u16 = 0;
 
         let mut send_count: u16 = 0;
-        let mut received_count: u16 = 0;
-        let mut latencies: Vec<f64> = Vec::new();
 
         let ping_header = ping_header_msg2(&self.dst_ip, self.dst_port, ConnectMethod::TCP);
         println!("{ping_header}");
@@ -189,8 +177,6 @@ impl TcpClient {
 
             send_count += 1;
         }
-
-        // println!("{:#?}", results_map);
 
         for (_, addrs) in results_map {
             for (addr, latencies) in addrs {
@@ -339,7 +325,7 @@ pub fn client_result_msg(record: &ConnectRecord) -> String {
         | ConnectResult::Unknown => {
             format!(
                 "{} => proto={} src={} dst={}",
-                record.result.to_string(),
+                record.result,
                 record.protocol.to_string().to_uppercase(),
                 record.source,
                 record.destination,

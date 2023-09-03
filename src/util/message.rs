@@ -80,12 +80,9 @@ pub fn client_summary_msg2(
     protocol: ConnectMethod,
     client_summary: ClientSummary2,
 ) -> String {
-    let mut received_count = 0;
-
     let mut min: f64 = 0.0;
     let mut max: f64 = 0.0;
     let mut avg: f64 = 0.0;
-
     let mut latencies = client_summary.latencies;
 
     // Filetr our any f64::NAN
@@ -96,14 +93,16 @@ pub fn client_summary_msg2(
     // TODO: Fix this unwrap
     latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-    min = *latencies.first().unwrap_or(&0.0);
-    max = *latencies.last().unwrap_or(&0.0);
-    let count: f64 = latencies.iter().sum();
-    avg = count / latencies.len() as f64;
+    if !latencies.is_empty() {
+        min = *latencies.first().unwrap_or(&0.0);
+        max = *latencies.last().unwrap_or(&0.0);
+        let sum: f64 = latencies.iter().sum();
+        avg = sum / latencies.len() as f64;
+    }
 
-    received_count = latencies.len() as u16;
+    let received_count = latencies.len() as u16;
 
-    format!(
+    let msg = format!(
         "\nStatistics for {} connection to {} 
 sent={} received={} lost={} ({:.2}% loss)
 min={:.3}ms max={:.3}ms avg={:.3}ms",
@@ -116,7 +115,8 @@ min={:.3}ms max={:.3}ms avg={:.3}ms",
         min,
         max,
         avg,
-    )
+    );
+    msg
 }
 
 /// Returns a server connection summary message

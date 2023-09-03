@@ -1,6 +1,5 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use anyhow::Result;
 use time::OffsetDateTime;
 
 /// Get the current unix timestamp in microseconds
