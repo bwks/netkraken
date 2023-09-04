@@ -1,6 +1,4 @@
-use crate::core::common::{
-    ClientSummary, ClientSummary2, ConnectMethod, ConnectRecord, ConnectResult,
-};
+use crate::core::common::{ClientSummary, ConnectMethod, ConnectRecord, ConnectResult};
 
 /// Return the CLI header message
 pub fn cli_header_msg() -> String {
@@ -19,15 +17,7 @@ Press CRTL+C to exit
 }
 
 /// Return a ping header message
-pub fn ping_header_msg(destination: &String, protocol: ConnectMethod) -> String {
-    format!(
-        "Connecting to {} via {}",
-        destination,
-        protocol.to_string().to_uppercase(),
-    )
-}
-
-pub fn ping_header_msg2(destination: &String, port: u16, protocol: ConnectMethod) -> String {
+pub fn ping_header_msg(destination: &String, port: u16, protocol: ConnectMethod) -> String {
     format!(
         "Connecting to {}:{} via {}",
         destination,
@@ -73,46 +63,6 @@ pub fn client_summary_msg(
     let mut min: f64 = 0.0;
     let mut max: f64 = 0.0;
     let mut avg: f64 = 0.0;
-
-    if !client_summary.latencies.is_empty() {
-        let mut latencies = client_summary.latencies;
-        // Filetr our any f64::NAN
-        latencies.retain(|f| !f.is_nan());
-        // Sort lowest to highest
-        // TODO: Fix this unwrap
-        latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-        min = *latencies.first().unwrap_or(&0.0);
-        max = *latencies.last().unwrap_or(&0.0);
-        let count: f64 = latencies.iter().sum();
-        avg = count / latencies.len() as f64;
-    }
-
-    format!(
-        "\nStatistics for {} connection to {} 
- sent={} received={} lost={} ({:.2}% loss)
- min={:.3}ms max={:.3}ms avg={:.3}ms",
-        protocol.to_string().to_uppercase(),
-        destination,
-        client_summary.send_count,
-        client_summary.received_count,
-        client_summary.send_count - client_summary.received_count,
-        calc_loss_percent(client_summary.send_count, client_summary.received_count),
-        min,
-        max,
-        avg,
-    )
-}
-
-/// Returns a client connection summary message
-pub fn client_summary_msg2(
-    destination: &String,
-    protocol: ConnectMethod,
-    client_summary: ClientSummary2,
-) -> String {
-    let mut min: f64 = 0.0;
-    let mut max: f64 = 0.0;
-    let mut avg: f64 = 0.0;
     let mut latencies = client_summary.latencies;
 
     // Filetr our any f64::NAN
@@ -134,8 +84,8 @@ pub fn client_summary_msg2(
 
     let msg = format!(
         "\nStatistics for {} connection to {} 
-sent={} received={} lost={} ({:.2}% loss)
-min={:.3}ms max={:.3}ms avg={:.3}ms",
+ sent={} received={} lost={} ({:.2}% loss)
+ min={:.3}ms max={:.3}ms avg={:.3}ms",
         protocol.to_string().to_uppercase(),
         destination,
         client_summary.send_count,
@@ -193,7 +143,7 @@ mod tests {
 
     #[test]
     fn ping_header_msg_is_expected() {
-        let msg = ping_header_msg(&"198.51.100.1:443".to_owned(), ConnectMethod::TCP);
+        let msg = ping_header_msg(&"198.51.100.1".to_owned(), 443, ConnectMethod::TCP);
 
         assert_eq!(msg, "Connecting to 198.51.100.1:443 via TCP");
     }
@@ -229,7 +179,6 @@ mod tests {
     fn client_summary_msg_is_expected() {
         let client_summary = ClientSummary {
             send_count: 4,
-            received_count: 3,
             latencies: vec![104.921, 108.447, 105.009],
         };
         let msg = client_summary_msg(

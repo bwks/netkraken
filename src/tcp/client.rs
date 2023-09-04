@@ -10,12 +10,12 @@ use tokio::signal;
 use tokio::time::{timeout, Duration};
 
 use crate::core::common::{
-    ClientSummary2, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, IpPort,
+    ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, IpPort,
     OutputOptions, PingOptions,
 };
 use crate::core::konst::{BIND_ADDR, BIND_PORT, BUFFER_SIZE};
 use crate::util::handler::{io_error_switch_handler, loop_handler, output_handler2};
-use crate::util::message::{client_result_msg, client_summary_msg2, ping_header_msg2};
+use crate::util::message::{client_result_msg, client_summary_msg, ping_header_msg};
 use crate::util::parser::parse_ipaddr;
 use crate::util::time::{calc_connect_ms, time_now_us};
 
@@ -112,10 +112,9 @@ impl TcpClient {
         }
 
         let mut count: u16 = 0;
-
         let mut send_count: u16 = 0;
 
-        let ping_header = ping_header_msg2(&self.dst_ip, self.dst_port, ConnectMethod::TCP);
+        let ping_header = ping_header_msg(&self.dst_ip, self.dst_port, ConnectMethod::TCP);
         println!("{ping_header}");
 
         let cancel = Arc::new(AtomicBool::new(false));
@@ -166,11 +165,11 @@ impl TcpClient {
 
         for (_, addrs) in results_map {
             for (addr, latencies) in addrs {
-                let client_summary = ClientSummary2 {
+                let client_summary = ClientSummary {
                     send_count,
                     latencies,
                 };
-                let summary_msg = client_summary_msg2(&addr, ConnectMethod::TCP, client_summary);
+                let summary_msg = client_summary_msg(&addr, ConnectMethod::TCP, client_summary);
                 println!("{}", summary_msg);
             }
         }

@@ -8,19 +8,16 @@ use futures::StreamExt;
 use tokio::net::UdpSocket;
 use tokio::signal;
 use tokio::time::{timeout, Duration};
-use uuid::Uuid;
 
 use crate::core::common::{
-    ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, LogLevel, NetKrakenMessage,
+    ClientSummary, HostRecord, HostResults, IpPort, OutputOptions, PingOptions,
 };
-use crate::core::common::{
-    ClientSummary2, HostRecord, HostResults, IpPort, OutputOptions, PingOptions,
-};
+use crate::core::common::{ConnectMethod, ConnectRecord, ConnectResult};
 use crate::core::konst::{BIND_ADDR, BIND_PORT, BUFFER_SIZE, MAX_PACKET_SIZE, PING_MSG};
 use crate::util::handler::{io_error_switch_handler, loop_handler, output_handler2};
-use crate::util::message::{client_result_msg, client_summary_msg2, ping_header_msg2};
-use crate::util::parser::{nk_msg_reader, parse_ipaddr};
-use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
+use crate::util::message::{client_result_msg, client_summary_msg, ping_header_msg};
+use crate::util::parser::parse_ipaddr;
+use crate::util::time::{calc_connect_ms, time_now_us};
 
 pub struct UdpClient {
     pub dst_ip: String,
@@ -108,7 +105,7 @@ impl UdpClient {
         let mut count: u16 = 0;
         let mut send_count: u16 = 0;
 
-        let ping_header = ping_header_msg2(&self.dst_ip, self.dst_port, ConnectMethod::UDP);
+        let ping_header = ping_header_msg(&self.dst_ip, self.dst_port, ConnectMethod::UDP);
         println!("{ping_header}");
 
         let cancel = Arc::new(AtomicBool::new(false));
@@ -159,11 +156,11 @@ impl UdpClient {
 
         for (_, addrs) in results_map {
             for (addr, latencies) in addrs {
-                let client_summary = ClientSummary2 {
+                let client_summary = ClientSummary {
                     send_count,
                     latencies,
                 };
-                let summary_msg = client_summary_msg2(&addr, ConnectMethod::UDP, client_summary);
+                let summary_msg = client_summary_msg(&addr, ConnectMethod::UDP, client_summary);
                 println!("{}", summary_msg);
             }
         }
@@ -285,13 +282,6 @@ async fn connect_host(
                     //     // println!("{:#?}", m);
                     // }
                 }
-
-                // output_handler(
-                //     LogLevel::INFO,
-                //     &conn_record.client_success_msg(),
-                //     &self.output_options,
-                // )
-                // .await;
             }
         }
         Err(e) => {

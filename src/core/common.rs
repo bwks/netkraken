@@ -132,41 +132,7 @@ error: {}
     }
 }
 
-impl ConnectRecord {
-    pub fn client_success_msg(&self) -> String {
-        format!(
-            "{} => proto={} src={} dst={} time={:.3}ms",
-            self.result,
-            self.protocol.to_string().to_uppercase(),
-            self.source,
-            self.destination,
-            self.time,
-        )
-    }
-    pub fn client_error_msg(&self, error: std::io::Error) -> String {
-        let err = match error.kind() {
-            std::io::ErrorKind::ConnectionRefused => ConnectResult::Refused,
-            std::io::ErrorKind::ConnectionReset => ConnectResult::Reset,
-            std::io::ErrorKind::TimedOut => ConnectResult::Timeout,
-            _ => ConnectResult::Unknown,
-        };
-
-        format!(
-            "{} => proto={} src={} dst={}",
-            err,
-            self.protocol.to_string().to_uppercase(),
-            self.source,
-            self.destination,
-        )
-    }
-}
-
 pub struct ClientSummary {
-    pub send_count: u16,
-    pub received_count: u16,
-    pub latencies: Vec<f64>,
-}
-pub struct ClientSummary2 {
     pub send_count: u16,
     pub latencies: Vec<f64>,
 }
