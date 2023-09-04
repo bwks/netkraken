@@ -4,6 +4,7 @@ use tracing::Level;
 
 use crate::core::common::LogLevel;
 use crate::core::common::OutputOptions;
+use crate::core::common::{ConnectRecord, ConnectResult};
 use crate::core::konst::APP_NAME;
 
 /// Handler to manage loop iterations. On `true` the loop
@@ -41,6 +42,34 @@ pub async fn output_handler(log_level: LogLevel, message: &String, output_option
             LogLevel::INFO => event!(target: APP_NAME, Level::INFO, "{message}"),
             LogLevel::WARN => event!(target: APP_NAME, Level::WARN, "{message}"),
             LogLevel::TRACE => event!(target: APP_NAME, Level::TRACE, "{message}"),
+        };
+    }
+    if output_options.json {
+        // json handler
+    }
+}
+
+pub fn io_error_switch_handler(error: std::io::Error) -> ConnectResult {
+    match error.kind() {
+        std::io::ErrorKind::ConnectionRefused => ConnectResult::Refused,
+        std::io::ErrorKind::ConnectionReset => ConnectResult::Reset,
+        std::io::ErrorKind::TimedOut => ConnectResult::Timeout,
+        _ => ConnectResult::Unknown,
+    }
+}
+
+pub async fn output_handler2(
+    record: &ConnectRecord,
+    message: &String,
+    output_options: &OutputOptions,
+) {
+    if !output_options.quiet {
+        println!("{message}");
+    }
+    if output_options.syslog {
+        match record.success {
+            true => event!(target: APP_NAME, Level::INFO, "{message}"),
+            false => event!(target: APP_NAME, Level::ERROR, "{message}"),
         };
     }
     if output_options.json {

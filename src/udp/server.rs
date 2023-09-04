@@ -53,7 +53,7 @@ impl UdpServer {
             buffer.truncate(len);
 
             let receive_time_utc = time_now_utc();
-            let receive_time_stamp = time_now_us()?;
+            let receive_time_stamp = time_now_us();
             let local_addr = &reader.local_addr()?.to_string();
             let peer_addr = &addr.to_string();
 

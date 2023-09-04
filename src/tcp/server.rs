@@ -36,7 +36,7 @@ impl TcpServer {
 
             tokio::spawn(async move {
                 let receive_time_utc = time_now_utc();
-                let receive_time_stamp = time_now_us()?;
+                let receive_time_stamp = time_now_us();
 
                 let mut buffer = vec![0u8; MAX_PACKET_SIZE];
 

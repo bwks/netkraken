@@ -52,7 +52,7 @@ pub struct Cli {
     pub src_port: u16,
 
     /// Connection timeout (in milliseconds)
-    #[clap(short, long, default_value_t = 5000)]
+    #[clap(short, long, default_value_t = 3000)]
     pub timeout: u16,
 
     // Server specific options
