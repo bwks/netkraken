@@ -1,5 +1,5 @@
 use std::fmt::Display;
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 
 use anyhow::Result;
 use clap::ValueEnum;
@@ -301,4 +301,16 @@ mod tests {
         assert!(!host_record.ipv4_sockets.is_empty());
         assert!(!host_record.ipv6_sockets.is_empty());
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct IpPort {
+    pub ip: IpAddr,
+    pub port: u16,
+}
+
+#[derive(Debug, Clone)]
+pub struct HostResults {
+    pub host: String,
+    pub results: Vec<ConnectRecord>,
 }

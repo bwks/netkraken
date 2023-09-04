@@ -2,9 +2,9 @@ use tokio::time::{sleep, Duration};
 use tracing::event;
 use tracing::Level;
 
-use crate::core::common::ConnectRecord;
 use crate::core::common::LogLevel;
 use crate::core::common::OutputOptions;
+use crate::core::common::{ConnectRecord, ConnectResult};
 use crate::core::konst::APP_NAME;
 
 /// Handler to manage loop iterations. On `true` the loop
@@ -46,6 +46,15 @@ pub async fn output_handler(log_level: LogLevel, message: &String, output_option
     }
     if output_options.json {
         // json handler
+    }
+}
+
+pub fn io_error_switch_handler(error: std::io::Error) -> ConnectResult {
+    match error.kind() {
+        std::io::ErrorKind::ConnectionRefused => ConnectResult::Refused,
+        std::io::ErrorKind::ConnectionReset => ConnectResult::Reset,
+        std::io::ErrorKind::TimedOut => ConnectResult::Timeout,
+        _ => ConnectResult::Unknown,
     }
 }
 

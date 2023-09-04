@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::net::{IpAddr, SocketAddr};
+use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -10,34 +10,14 @@ use tokio::signal;
 use tokio::time::{timeout, Duration};
 
 use crate::core::common::{
-    ClientSummary2, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, OutputOptions,
-    PingOptions,
+    ClientSummary2, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, IpPort,
+    OutputOptions, PingOptions,
 };
-use crate::core::konst::{BIND_ADDR, BIND_PORT};
-use crate::util::handler::{loop_handler, output_handler2};
-use crate::util::message::{client_summary_msg2, ping_header_msg2};
+use crate::core::konst::{BIND_ADDR, BIND_PORT, BUFFER_SIZE};
+use crate::util::handler::{io_error_switch_handler, loop_handler, output_handler2};
+use crate::util::message::{client_result_msg, client_summary_msg2, ping_header_msg2};
 use crate::util::parser::parse_ipaddr;
 use crate::util::time::{calc_connect_ms, time_now_us};
-
-const BUFFER_SIZE: usize = 100;
-
-#[derive(Debug, Clone)]
-struct IpPort {
-    ip: IpAddr,
-    port: u16,
-}
-
-#[derive(Debug, Clone)]
-pub struct HostConnection {
-    pub socket: String,
-    pub is_open: bool,
-}
-
-#[derive(Debug, Clone)]
-pub struct HostResults {
-    pub host: String,
-    results: Vec<ConnectRecord>,
-}
 
 #[derive(Debug)]
 pub struct TcpClient {
@@ -281,14 +261,14 @@ async fn connect_host(
             // Connection timeout
             Err(e) => {
                 let error_msg = e.to_string();
-                conn_record.result = io_error_switch(e);
+                conn_record.result = io_error_switch_handler(e);
                 conn_record.error_msg = Some(error_msg);
             }
         },
         // Timeout error
         Err(e) => {
             let error_msg = e.to_string();
-            conn_record.result = io_error_switch(e.into());
+            conn_record.result = io_error_switch_handler(e.into());
             conn_record.error_msg = Some(error_msg);
         }
     };
@@ -302,40 +282,4 @@ async fn get_tcp_socket(bind_addr: SocketAddr) -> Result<TcpSocket> {
     };
     socket.bind(bind_addr)?;
     Ok(socket)
-}
-
-pub fn io_error_switch(error: std::io::Error) -> ConnectResult {
-    match error.kind() {
-        std::io::ErrorKind::ConnectionRefused => ConnectResult::Refused,
-        std::io::ErrorKind::ConnectionReset => ConnectResult::Reset,
-        std::io::ErrorKind::TimedOut => ConnectResult::Timeout,
-        _ => ConnectResult::Unknown,
-    }
-}
-
-pub fn client_result_msg(record: &ConnectRecord) -> String {
-    match record.result {
-        ConnectResult::Ping | ConnectResult::Pong => {
-            format!(
-                "{} => proto={} src={} dst={} time={:.3}ms",
-                record.result,
-                record.protocol.to_string().to_uppercase(),
-                record.source,
-                record.destination,
-                record.time,
-            )
-        }
-        ConnectResult::Refused
-        | ConnectResult::Reset
-        | ConnectResult::Timeout
-        | ConnectResult::Unknown => {
-            format!(
-                "{} => proto={} src={} dst={}",
-                record.result,
-                record.protocol.to_string().to_uppercase(),
-                record.source,
-                record.destination,
-            )
-        }
-    }
 }

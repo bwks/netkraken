@@ -1,4 +1,6 @@
-use crate::core::common::{ClientSummary, ClientSummary2, ConnectMethod, ConnectResult};
+use crate::core::common::{
+    ClientSummary, ClientSummary2, ConnectMethod, ConnectRecord, ConnectResult,
+};
 
 /// Return the CLI header message
 pub fn cli_header_msg() -> String {
@@ -32,6 +34,34 @@ pub fn ping_header_msg2(destination: &String, port: u16, protocol: ConnectMethod
         port,
         protocol.to_string().to_uppercase(),
     )
+}
+
+/// Returns a client result message
+pub fn client_result_msg(record: &ConnectRecord) -> String {
+    match record.result {
+        ConnectResult::Ping | ConnectResult::Pong => {
+            format!(
+                "{} => proto={} src={} dst={} time={:.3}ms",
+                record.result,
+                record.protocol.to_string().to_uppercase(),
+                record.source,
+                record.destination,
+                record.time,
+            )
+        }
+        ConnectResult::Refused
+        | ConnectResult::Reset
+        | ConnectResult::Timeout
+        | ConnectResult::Unknown => {
+            format!(
+                "{} => proto={} src={} dst={}",
+                record.result,
+                record.protocol.to_string().to_uppercase(),
+                record.source,
+                record.destination,
+            )
+        }
+    }
 }
 
 /// Returns a client connection summary message
