@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -14,9 +13,13 @@ use crate::core::common::{
 };
 use crate::core::common::{ConnectMethod, ConnectRecord, ConnectResult};
 use crate::core::konst::{BIND_ADDR, BIND_PORT, BUFFER_SIZE, MAX_PACKET_SIZE, PING_MSG};
+use crate::util::dns::resolve_host;
 use crate::util::handler::{io_error_switch_handler, loop_handler, output_handler2};
-use crate::util::message::{client_result_msg, client_summary_msg, ping_header_msg};
+use crate::util::message::{
+    client_result_msg, client_summary_msg, ping_header_msg, resolved_ips_msg,
+};
 use crate::util::parser::parse_ipaddr;
+use crate::util::result::get_results_map;
 use crate::util::time::{calc_connect_ms, time_now_us};
 
 pub struct UdpClient {
@@ -48,8 +51,6 @@ impl UdpClient {
     }
 
     pub async fn connect(&self) -> Result<()> {
-        let mut results_map: HashMap<String, HashMap<String, Vec<f64>>> = HashMap::new();
-
         let src_ip_port = IpPort {
             ip: parse_ipaddr(&self.src_ip)?,
             port: self.src_port,
@@ -59,48 +60,19 @@ impl UdpClient {
 
         let hosts = vec![host_records.clone()];
 
-        let lookup_data: Vec<HostRecord> = futures::stream::iter(hosts)
-            .map(|host| {
-                async move {
-                    //
-                    HostRecord::new(&host.host, host.port).await
-                }
-            })
-            .buffer_unordered(BUFFER_SIZE)
-            .collect()
-            .await;
+        let resolved_hosts = resolve_host(hosts).await;
 
-        let mut resolved_hosts: Vec<HostRecord> = vec![];
-        for lookup in lookup_data.clone() {
-            if lookup.ipv4_sockets.is_empty() && lookup.ipv6_sockets.is_empty() {
-                // println!("{} returned no IPs", lookup.host);
-                bail!("{} returned no IPs", lookup.host);
+        for record in &resolved_hosts {
+            match record.ipv4_sockets.is_empty() && record.ipv6_sockets.is_empty() {
+                true => bail!("{} did not resolve to an IP address", record.host),
+                false => {
+                    let resolved_host_msg = resolved_ips_msg(record);
+                    println!("{resolved_host_msg}");
+                }
             }
-            resolved_hosts.push(lookup.clone());
-            println!(
-                "{} resolves to {} IPs",
-                lookup.host,
-                lookup.ipv4_sockets.len() + lookup.ipv6_sockets.len()
-            );
-            results_map.insert(lookup.host.to_owned(), HashMap::new());
-            for addr in lookup.ipv4_sockets {
-                println!(" - {}", addr.ip());
-                results_map
-                    .get_mut(&lookup.host)
-                    // this should never fail because we just inserted lookup.host
-                    .unwrap()
-                    .insert(addr.to_string(), vec![]);
-            }
-            for addr in lookup.ipv6_sockets {
-                println!(" - {}", addr.ip());
-                results_map
-                    .get_mut(&lookup.host)
-                    // this should never fail because we just inserted lookup.host
-                    .unwrap()
-                    .insert(addr.to_string(), vec![]);
-            }
-            println!();
         }
+
+        let mut results_map = get_results_map(&resolved_hosts);
 
         let mut count: u16 = 0;
         let mut send_count: u16 = 0;
