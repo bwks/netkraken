@@ -14,6 +14,7 @@ use crate::core::common::{
     OutputOptions, PingOptions,
 };
 use crate::core::konst::{BIND_ADDR, BIND_PORT, BUFFER_SIZE};
+use crate::util::dns::resolve_host;
 use crate::util::handler::{io_error_switch_handler, loop_handler, output_handler2};
 use crate::util::message::{client_result_msg, client_summary_msg, ping_header_msg};
 use crate::util::parser::parse_ipaddr;
@@ -68,32 +69,23 @@ impl TcpClient {
 
         let hosts = vec![host_records.clone()];
 
-        let lookup_data: Vec<HostRecord> = futures::stream::iter(hosts)
-            .map(|host| {
-                async move {
-                    //
-                    HostRecord::new(&host.host, host.port).await
-                }
-            })
-            .buffer_unordered(BUFFER_SIZE)
-            .collect()
-            .await;
+        let resolved_hosts = resolve_host(hosts).await;
 
-        let mut resolved_hosts: Vec<HostRecord> = vec![];
-        for lookup in lookup_data.clone() {
+        for lookup in resolved_hosts.clone() {
             if lookup.ipv4_sockets.is_empty() && lookup.ipv6_sockets.is_empty() {
                 // println!("{} returned no IPs", lookup.host);
                 bail!("{} returned no IPs", lookup.host);
             }
-            resolved_hosts.push(lookup.clone());
-            println!(
-                "{} resolves to {} IPs",
-                lookup.host,
-                lookup.ipv4_sockets.len() + lookup.ipv6_sockets.len()
-            );
+            // println!(
+            //     "{} resolves to {} IPs",
+            //     lookup.host,
+            //     lookup.ipv4_sockets.len() + lookup.ipv6_sockets.len()
+            // );
             results_map.insert(lookup.host.to_owned(), HashMap::new());
+
             for addr in lookup.ipv4_sockets {
-                println!(" - {}", addr.ip());
+                // println!(" - {}", addr.ip());
+
                 results_map
                     .get_mut(&lookup.host)
                     // this should never fail because we just inserted lookup.host
@@ -101,7 +93,8 @@ impl TcpClient {
                     .insert(addr.to_string(), vec![]);
             }
             for addr in lookup.ipv6_sockets {
-                println!(" - {}", addr.ip());
+                // println!(" - {}", addr.ip());
+
                 results_map
                     .get_mut(&lookup.host)
                     // this should never fail because we just inserted lookup.host
