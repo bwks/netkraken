@@ -3,7 +3,7 @@ use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use futures::StreamExt;
 use tokio::net::TcpSocket;
 use tokio::signal;
@@ -82,8 +82,8 @@ impl TcpClient {
         let mut resolved_hosts: Vec<HostRecord> = vec![];
         for lookup in lookup_data.clone() {
             if lookup.ipv4_sockets.is_empty() && lookup.ipv6_sockets.is_empty() {
-                println!("{} returned no IPs", lookup.host);
-                continue;
+                // println!("{} returned no IPs", lookup.host);
+                bail!("{} returned no IPs", lookup.host);
             }
             resolved_hosts.push(lookup.clone());
             println!(
