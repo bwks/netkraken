@@ -1,4 +1,6 @@
-use crate::core::common::{ClientSummary, ConnectMethod, ConnectRecord, ConnectResult};
+use std::net::SocketAddr;
+
+use crate::core::common::{ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord};
 
 /// Return the CLI header message
 pub fn cli_header_msg() -> String {
@@ -13,6 +15,30 @@ Press CRTL+C to exit
 ",
         protocol.to_string().to_uppercase(),
         &bind_addr
+    )
+}
+
+/// Return a list of resolved IPs from a hostname
+pub fn resolved_ips_msg(host_record: &HostRecord) -> String {
+    let ip_records: Vec<&SocketAddr> = host_record
+        .ipv4_sockets
+        .iter()
+        .chain(host_record.ipv6_sockets.iter())
+        .collect();
+
+    let ip_str = ip_records
+        .iter()
+        .map(|x| format!(" {}", x.ip()))
+        .collect::<Vec<String>>()
+        .join("\n");
+
+    format!(
+        "{} resolves to {} IPs
+{}
+",
+        host_record.host,
+        host_record.ipv4_sockets.len() + host_record.ipv6_sockets.len(),
+        ip_str,
     )
 }
 
@@ -139,7 +165,74 @@ pub fn calc_loss_percent(sent: u16, received: u16) -> f64 {
 
 #[cfg(test)]
 mod tests {
+    use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+
+    use crate::core::common::HostRecord;
     use crate::util::message::*;
+
+    #[test]
+    fn resolved_ips_msg_with_no_ips_is_expected() {
+        let host_record = HostRecord {
+            host: "blah.bleh".to_owned(),
+            port: 443,
+            ipv4_sockets: vec![],
+            ipv6_sockets: vec![],
+        };
+        let msg = resolved_ips_msg(&host_record);
+
+        assert_eq!(msg, "blah.bleh resolves to 0 IPs\n\n");
+    }
+
+    #[test]
+    fn resolved_ips_msg_with_only_ip4s_is_expected() {
+        let host_record = HostRecord {
+            host: "blah.bleh".to_owned(),
+            port: 443,
+            ipv4_sockets: vec![SocketAddr::new(
+                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                443,
+            )],
+            ipv6_sockets: vec![],
+        };
+        let msg = resolved_ips_msg(&host_record);
+
+        assert_eq!(msg, "blah.bleh resolves to 1 IPs\n 127.0.0.1\n");
+    }
+
+    #[test]
+    fn resolved_ips_msg_with_only_ip6s_is_expected() {
+        let host_record = HostRecord {
+            host: "blah.bleh".to_owned(),
+            port: 443,
+            ipv4_sockets: vec![],
+            ipv6_sockets: vec![SocketAddr::new(
+                IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
+                443,
+            )],
+        };
+        let msg = resolved_ips_msg(&host_record);
+
+        assert_eq!(msg, "blah.bleh resolves to 1 IPs\n ::1\n");
+    }
+
+    #[test]
+    fn resolved_ips_msg_with_ipv4_and_ip6s_is_expected() {
+        let host_record = HostRecord {
+            host: "blah.bleh".to_owned(),
+            port: 443,
+            ipv4_sockets: vec![SocketAddr::new(
+                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+                443,
+            )],
+            ipv6_sockets: vec![SocketAddr::new(
+                IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
+                443,
+            )],
+        };
+        let msg = resolved_ips_msg(&host_record);
+
+        assert_eq!(msg, "blah.bleh resolves to 2 IPs\n 127.0.0.1\n ::1\n");
+    }
 
     #[test]
     fn ping_header_msg_is_expected() {
