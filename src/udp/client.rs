@@ -9,14 +9,15 @@ use tokio::signal;
 use tokio::time::{timeout, Duration};
 
 use crate::core::common::{
-    ClientSummary, HostRecord, HostResults, IpPort, OutputOptions, PingOptions,
+    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord,
+    HostResults, IpPort, OutputOptions, PingOptions,
 };
-use crate::core::common::{ConnectMethod, ConnectRecord, ConnectResult};
 use crate::core::konst::{BIND_ADDR, BIND_PORT, BUFFER_SIZE, MAX_PACKET_SIZE, PING_MSG};
 use crate::util::dns::resolve_host;
 use crate::util::handler::{io_error_switch_handler, loop_handler, output_handler2};
 use crate::util::message::{
-    client_result_msg, client_summary_msg, ping_header_msg, resolved_ips_msg,
+    client_result_msg, client_summary_msg, client_summary_table_msg, ping_header_msg,
+    resolved_ips_msg,
 };
 use crate::util::parser::parse_ipaddr;
 use crate::util::result::get_results_map;
@@ -126,6 +127,7 @@ impl UdpClient {
             send_count += 1;
         }
 
+        let mut client_results: Vec<ClientResult> = Vec::new();
         for (_, addrs) in results_map {
             for (addr, latencies) in addrs {
                 let client_summary = ClientSummary {
@@ -133,9 +135,17 @@ impl UdpClient {
                     latencies,
                 };
                 let summary_msg = client_summary_msg(&addr, ConnectMethod::UDP, client_summary);
-                println!("{}", summary_msg);
+                client_results.push(summary_msg)
             }
         }
+
+        let summary_table = client_summary_table_msg(
+            &self.dst_ip,
+            self.dst_port,
+            ConnectMethod::UDP,
+            &client_results,
+        );
+        println!("{}", summary_table);
 
         Ok(())
     }
