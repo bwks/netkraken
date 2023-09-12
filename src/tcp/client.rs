@@ -4,20 +4,20 @@ use std::sync::Arc;
 
 use anyhow::{bail, Result};
 use futures::StreamExt;
-use tabled::Table;
 use tokio::net::TcpSocket;
 use tokio::signal;
 use tokio::time::{timeout, Duration};
 
 use crate::core::common::{
-    ClientSummary, ClientSummary2, ConnectMethod, ConnectRecord, ConnectResult, HostRecord,
+    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord,
     HostResults, IpPort, OutputOptions, PingOptions,
 };
 use crate::core::konst::{BIND_ADDR, BIND_PORT, BUFFER_SIZE};
 use crate::util::dns::resolve_host;
 use crate::util::handler::{io_error_switch_handler, loop_handler, output_handler2};
 use crate::util::message::{
-    client_result_msg, client_summary_msg2, ping_header_msg, resolved_ips_msg,
+    client_result_msg, client_summary_msg, client_summary_table_msg, ping_header_msg,
+    resolved_ips_msg,
 };
 use crate::util::parser::parse_ipaddr;
 use crate::util::result::get_results_map;
@@ -136,21 +136,26 @@ impl TcpClient {
             send_count += 1;
         }
 
-        let mut client_results: Vec<ClientSummary2> = Vec::new();
+        let mut client_results: Vec<ClientResult> = Vec::new();
         for (_, addrs) in results_map {
             for (addr, latencies) in addrs {
                 let client_summary = ClientSummary {
                     send_count,
                     latencies,
                 };
-                let summary_msg = client_summary_msg2(&addr, ConnectMethod::TCP, client_summary);
+                let summary_msg = client_summary_msg(&addr, ConnectMethod::TCP, client_summary);
                 // println!("{}", summary_msg);
                 client_results.push(summary_msg)
             }
         }
 
-        let table = Table::new(client_results).to_string();
-        println!("{table}");
+        let summary_table = client_summary_table_msg(
+            &self.dst_ip,
+            self.dst_port,
+            ConnectMethod::TCP,
+            &client_results,
+        );
+        println!("{}", summary_table);
 
         Ok(())
     }
