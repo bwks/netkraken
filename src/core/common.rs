@@ -4,6 +4,7 @@ use std::net::{IpAddr, SocketAddr};
 use anyhow::Result;
 use clap::ValueEnum;
 use serde_derive::{Deserialize, Serialize};
+use tabled::Tabled;
 
 use crate::util::time::{time_now_us, time_now_utc};
 
@@ -135,6 +136,49 @@ error: {}
 pub struct ClientSummary {
     pub send_count: u16,
     pub latencies: Vec<f64>,
+}
+
+pub struct ClientSummary2 {
+    pub destination: String,
+    pub protocol: ConnectMethod,
+    pub sent: u16,
+    pub received: u16,
+    pub lost: u16,
+    pub loss_percent: f64,
+    pub min: f64,
+    pub max: f64,
+    pub avg: f64,
+}
+impl Tabled for ClientSummary2 {
+    const LENGTH: usize = 42;
+
+    fn fields(&self) -> Vec<std::borrow::Cow<'_, str>> {
+        vec![
+            self.destination.clone().into(),
+            self.protocol.to_string().to_uppercase().into(),
+            self.sent.to_string().into(),
+            self.received.to_string().into(),
+            self.lost.to_string().into(),
+            format!("{:.2}", self.loss_percent).into(),
+            format!("{:.3}", self.min).into(),
+            format!("{:.3}", self.max).into(),
+            format!("{:.3}", self.avg).into(),
+        ]
+    }
+
+    fn headers() -> Vec<std::borrow::Cow<'static, str>> {
+        vec![
+            std::borrow::Cow::Borrowed("Destination"),
+            std::borrow::Cow::Borrowed("Protocol"),
+            std::borrow::Cow::Borrowed("Sent"),
+            std::borrow::Cow::Borrowed("Received"),
+            std::borrow::Cow::Borrowed("Lost"),
+            std::borrow::Cow::Borrowed("Loss %"),
+            std::borrow::Cow::Borrowed("Min"),
+            std::borrow::Cow::Borrowed("Max"),
+            std::borrow::Cow::Borrowed("Avg"),
+        ]
+    }
 }
 
 #[derive(Clone, Default, Debug, Deserialize, Serialize)]

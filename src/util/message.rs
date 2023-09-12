@@ -1,6 +1,8 @@
 use std::net::SocketAddr;
 
-use crate::core::common::{ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord};
+use crate::core::common::{
+    ClientSummary, ClientSummary2, ConnectMethod, ConnectRecord, ConnectResult, HostRecord,
+};
 
 /// Return the CLI header message
 pub fn cli_header_msg() -> String {
@@ -122,6 +124,48 @@ pub fn client_summary_msg(
         max,
         avg,
     );
+    msg
+}
+
+/// Returns a client connection summary message
+pub fn client_summary_msg2(
+    destination: &String,
+    protocol: ConnectMethod,
+    client_summary: ClientSummary,
+) -> ClientSummary2 {
+    let mut min: f64 = 0.0;
+    let mut max: f64 = 0.0;
+    let mut avg: f64 = 0.0;
+    let mut latencies = client_summary.latencies;
+
+    // Filetr our any f64::NAN
+    latencies.retain(|f| !f.is_nan());
+    latencies.retain(|f| f > &0.0);
+
+    // Sort lowest to highest
+    // TODO: Fix this unwrap
+    latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+    if !latencies.is_empty() {
+        min = *latencies.first().unwrap_or(&0.0);
+        max = *latencies.last().unwrap_or(&0.0);
+        let sum: f64 = latencies.iter().sum();
+        avg = sum / latencies.len() as f64;
+    }
+
+    let received_count = latencies.len() as u16;
+
+    let msg = ClientSummary2 {
+        destination: destination.to_owned(),
+        protocol,
+        sent: client_summary.send_count,
+        received: received_count,
+        lost: client_summary.send_count - received_count,
+        loss_percent: calc_loss_percent(client_summary.send_count, received_count),
+        min,
+        max,
+        avg,
+    };
     msg
 }
 
