@@ -23,24 +23,27 @@ pub fn server_start_msg(protocol: ConnectMethod, bind_addr: &String) -> String {
 
 /// Return a list of resolved IPs from a hostname
 pub fn resolved_ips_msg(host_record: &HostRecord) -> String {
+    let num_ips = host_record.ipv4_sockets.len() + host_record.ipv6_sockets.len();
+    let ip_desc = match num_ips {
+        1 => "IP",
+        _ => "IPs",
+    };
     let ip_records: Vec<&SocketAddr> = host_record
         .ipv4_sockets
         .iter()
         .chain(host_record.ipv6_sockets.iter())
         .collect();
 
-    let ip_str = ip_records
+    let ip_record_str = ip_records
         .iter()
         .map(|x| format!(" {}", x.ip()))
         .collect::<Vec<String>>()
         .join("\n");
 
     format!(
-        "{} resolves to {} IPs\n\
+        "{} resolves to {} {}\n\
         {}\n",
-        host_record.host,
-        host_record.ipv4_sockets.len() + host_record.ipv6_sockets.len(),
-        ip_str,
+        host_record.host, num_ips, ip_desc, ip_record_str,
     )
 }
 
@@ -171,7 +174,7 @@ mod tests {
         };
         let msg = resolved_ips_msg(&host_record);
 
-        assert_eq!(msg, "blah.bleh resolves to 1 IPs\n 127.0.0.1\n");
+        assert_eq!(msg, "blah.bleh resolves to 1 IP\n 127.0.0.1\n");
     }
 
     #[test]
@@ -187,7 +190,7 @@ mod tests {
         };
         let msg = resolved_ips_msg(&host_record);
 
-        assert_eq!(msg, "blah.bleh resolves to 1 IPs\n ::1\n");
+        assert_eq!(msg, "blah.bleh resolves to 1 IP\n ::1\n");
     }
 
     #[test]
