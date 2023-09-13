@@ -173,10 +173,10 @@ impl Tabled for ClientResult {
             std::borrow::Cow::Borrowed("Sent"),
             std::borrow::Cow::Borrowed("Received"),
             std::borrow::Cow::Borrowed("Lost"),
-            std::borrow::Cow::Borrowed("Loss %"),
-            std::borrow::Cow::Borrowed("Min"),
-            std::borrow::Cow::Borrowed("Max"),
-            std::borrow::Cow::Borrowed("Avg"),
+            std::borrow::Cow::Borrowed("Loss (%)"),
+            std::borrow::Cow::Borrowed("Min (ms)"),
+            std::borrow::Cow::Borrowed("Max (ms)"),
+            std::borrow::Cow::Borrowed("Avg (ms)"),
         ]
     }
 }
