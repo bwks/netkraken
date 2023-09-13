@@ -1,11 +1,10 @@
 use std::net::SocketAddr;
 
 use tabled::settings::Panel;
+use tabled::settings::{object::Rows, Alignment, Margin, Modify, Span, Style};
 use tabled::Table;
 
-use crate::core::common::{
-    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord,
-};
+use crate::core::common::{ClientResult, ConnectMethod, ConnectRecord, ConnectResult, HostRecord};
 
 /// Return the CLI header message
 pub fn cli_header_msg() -> String {
@@ -85,47 +84,6 @@ pub fn client_result_msg(record: &ConnectRecord) -> String {
     }
 }
 
-/// Returns a client connection summary message
-pub fn client_summary_msg(
-    destination: &String,
-    protocol: ConnectMethod,
-    client_summary: ClientSummary,
-) -> ClientResult {
-    let mut min: f64 = 0.0;
-    let mut max: f64 = 0.0;
-    let mut avg: f64 = 0.0;
-    let mut latencies = client_summary.latencies;
-
-    // Filetr our any f64::NAN
-    latencies.retain(|f| !f.is_nan());
-    latencies.retain(|f| f > &0.0);
-
-    // Sort lowest to highest
-    // TODO: Fix this unwrap
-    latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
-
-    if !latencies.is_empty() {
-        min = *latencies.first().unwrap_or(&0.0);
-        max = *latencies.last().unwrap_or(&0.0);
-        let sum: f64 = latencies.iter().sum();
-        avg = sum / latencies.len() as f64;
-    }
-
-    let received_count = latencies.len() as u16;
-
-    ClientResult {
-        destination: destination.to_owned(),
-        protocol,
-        sent: client_summary.send_count,
-        received: received_count,
-        lost: client_summary.send_count - received_count,
-        loss_percent: calc_loss_percent(client_summary.send_count, received_count),
-        min,
-        max,
-        avg,
-    }
-}
-
 pub fn client_summary_table_msg(
     dst_host: &String,
     dst_port: u16,
@@ -133,14 +91,22 @@ pub fn client_summary_table_msg(
     client_results: &Vec<ClientResult>,
 ) -> String {
     let header = format!(
-        "Statistics for {} connection to {}:{}",
+        "--- Statistics for {} connection to {}:{} ---",
         connect_method.to_string().to_uppercase(),
         dst_host,
         dst_port,
     );
-    let mut table = Table::new(client_results);
-    table.with(Panel::header(header));
-    table.to_string()
+    Table::new(client_results)
+        // table
+        .with(Style::ascii())
+        .with(Margin::new(0, 0, 1, 1))
+        .with(Panel::header(header))
+        .with(
+            Modify::new(Rows::first())
+                .with(Span::column(9))
+                .with(Alignment::center()),
+        )
+        .to_string()
 }
 
 /// Returns a server connection summary message
@@ -172,13 +138,6 @@ pub fn server_conn_success_msg(
             )
         }
     }
-}
-
-/// Calculate the percentage of loss between the
-/// amount of pings sent and the amount received
-pub fn calc_loss_percent(sent: u16, received: u16) -> f64 {
-    let percent = (sent as f64 - received as f64) / sent as f64;
-    percent * 100.0
 }
 
 #[cfg(test)]
@@ -260,13 +219,6 @@ mod tests {
     }
 
     #[test]
-    fn calc_loss_percent_is_expected() {
-        let loss = calc_loss_percent(100, 99);
-
-        assert_eq!(loss, 1.0);
-    }
-
-    #[test]
     fn cli_header_msg_is_expected() {
         let msg = cli_header_msg();
 
@@ -307,13 +259,14 @@ mod tests {
             &vec![client_results],
         );
 
-        let expected = "+--------------+----------+------+----------+------+--------+---------+---------+---------+\n\
-                        | Statistics for TCP connection to stuff.things:443                                       |\n\
-                        +--------------+----------+------+----------+------+--------+---------+---------+---------+\n\
-                        | Destination  | Protocol | Sent | Received | Lost | Loss % | Min     | Max     | Avg     |\n\
-                        +--------------+----------+------+----------+------+--------+---------+---------+---------+\n\
-                        | 198.51.100.1 | TCP      | 4    | 4        | 0    | 0.00   | 234.000 | 254.000 | 243.000 |\n\
-                        +--------------+----------+------+----------+------+--------+---------+---------+---------+";
+        let expected = "                                                                                                \n\
+        +--------------+----------+------+----------+------+----------+----------+----------+----------+\n\
+        |                  --- Statistics for TCP connection to stuff.things:443 ---                   |\n\
+        +--------------+----------+------+----------+------+----------+----------+----------+----------+\n\
+        | Destination  | Protocol | Sent | Received | Lost | Loss (%) | Min (ms) | Max (ms) | Avg (ms) |\n\
+        +--------------+----------+------+----------+------+----------+----------+----------+----------+\n\
+        | 198.51.100.1 | TCP      | 4    | 4        | 0    | 0.00     | 234.000  | 254.000  | 243.000  |\n\
+        +--------------+----------+------+----------+------+----------+----------+----------+----------+\n                                                                                                ";
 
         assert_eq!(summary_table, expected);
     }

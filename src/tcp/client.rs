@@ -16,11 +16,10 @@ use crate::core::konst::{BIND_ADDR, BIND_PORT, BUFFER_SIZE};
 use crate::util::dns::resolve_host;
 use crate::util::handler::{io_error_switch_handler, loop_handler, output_handler2};
 use crate::util::message::{
-    client_result_msg, client_summary_msg, client_summary_table_msg, ping_header_msg,
-    resolved_ips_msg,
+    client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg,
 };
 use crate::util::parser::parse_ipaddr;
-use crate::util::result::get_results_map;
+use crate::util::result::{client_summary_result, get_results_map};
 use crate::util::time::{calc_connect_ms, time_now_us};
 
 #[derive(Debug)]
@@ -143,7 +142,7 @@ impl TcpClient {
                     send_count,
                     latencies,
                 };
-                let summary_msg = client_summary_msg(&addr, ConnectMethod::TCP, client_summary);
+                let summary_msg = client_summary_result(&addr, ConnectMethod::TCP, client_summary);
                 // println!("{}", summary_msg);
                 client_results.push(summary_msg)
             }

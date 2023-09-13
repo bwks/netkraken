@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::core::common::HostRecord;
+use crate::core::common::{ClientResult, ClientSummary, ConnectMethod, HostRecord};
 
 /// Return a results_map hash from a Vec of HostRecords
 pub fn get_results_map(host_records: &[HostRecord]) -> HashMap<String, HashMap<String, Vec<f64>>> {
@@ -26,6 +26,54 @@ pub fn get_results_map(host_records: &[HostRecord]) -> HashMap<String, HashMap<S
     }
 
     results_map
+}
+
+/// Returns a client summary result
+pub fn client_summary_result(
+    destination: &String,
+    protocol: ConnectMethod,
+    client_summary: ClientSummary,
+) -> ClientResult {
+    let mut min: f64 = 0.0;
+    let mut max: f64 = 0.0;
+    let mut avg: f64 = 0.0;
+    let mut latencies = client_summary.latencies;
+
+    // Filetr our any f64::NAN
+    latencies.retain(|f| !f.is_nan());
+    latencies.retain(|f| f > &0.0);
+
+    // Sort lowest to highest
+    // TODO: Fix this unwrap
+    latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+
+    if !latencies.is_empty() {
+        min = *latencies.first().unwrap_or(&0.0);
+        max = *latencies.last().unwrap_or(&0.0);
+        let sum: f64 = latencies.iter().sum();
+        avg = sum / latencies.len() as f64;
+    }
+
+    let received_count = latencies.len() as u16;
+
+    ClientResult {
+        destination: destination.to_owned(),
+        protocol,
+        sent: client_summary.send_count,
+        received: received_count,
+        lost: client_summary.send_count - received_count,
+        loss_percent: calc_loss_percent(client_summary.send_count, received_count),
+        min,
+        max,
+        avg,
+    }
+}
+
+/// Calculate the percentage of loss between the
+/// amount of pings sent and the amount received
+pub fn calc_loss_percent(sent: u16, received: u16) -> f64 {
+    let percent = (sent as f64 - received as f64) / sent as f64;
+    percent * 100.0
 }
 
 #[cfg(test)]
@@ -84,5 +132,12 @@ mod tests {
             .insert(ipv6_sockets[0].to_string(), vec![]);
 
         assert_eq!(results_map, expected);
+    }
+
+    #[test]
+    fn calc_loss_percent_is_expected() {
+        let loss = calc_loss_percent(100, 99);
+
+        assert_eq!(loss, 1.0);
     }
 }
