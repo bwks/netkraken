@@ -14,9 +14,8 @@ pub fn cli_header_msg() -> String {
 /// Return server start message
 pub fn server_start_msg(protocol: ConnectMethod, bind_addr: &String) -> String {
     format!(
-        "{} server listening on {}
-Press CRTL+C to exit
-",
+        "{} server listening on {}\n\
+        Press CRTL+C to exit\n",
         protocol.to_string().to_uppercase(),
         &bind_addr
     )
@@ -37,9 +36,8 @@ pub fn resolved_ips_msg(host_record: &HostRecord) -> String {
         .join("\n");
 
     format!(
-        "{} resolves to {} IPs
-{}
-",
+        "{} resolves to {} IPs\n\
+        {}\n",
         host_record.host,
         host_record.ipv4_sockets.len() + host_record.ipv6_sockets.len(),
         ip_str,
