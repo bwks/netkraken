@@ -2,12 +2,27 @@
 
 NetKraken is a Network connectivity tester inspired by `nc`, `ncat` and the `netcat`s 
 of the world. 
- git status
-Goals:
- - Cross platform support, with Windows as a first class citizen
- - Async
 
-This project is a work in progress.
+> # 🚧 work in progress 🚧
+
+## Goals
+ - Cross platform support, with Windows as a first class citizen
+ - All clients and servers have Async support
+ - Rapidly prove which of the trinity of evil (Network/Firewall/DNS) is causing connectivity issues
+
+## Current Features
+ - TCP/UDP Client/Server 
+ - Asynchronous servers allowing for large amounts of client connections
+ - Asynchronous clients allow for simultaneous connections to multiple destinations
+
+## Planned Features
+ - HTTP Client
+ - DNS Client
+ - TCP/UDP traceroute
+ - Latency, Jitter, Bandwidth measurement
+
+## Installation
+Install the package for your system from the github release page [here](https://github.com/bwks/netkraken/releases)
 
 ## Usage
 ```
@@ -25,14 +40,15 @@ Options:
   -f, --file <FILE>          Logging filename [default: nk.log]
   -i, --interval <INTERVAL>  Interval between pings (in milliseconds) [default: 1000]
   -m, --method <METHOD>      Connection Method [default: tcp] [possible values: tcp, udp, icmp, http]
-  -r, --repeat <REPEAT>      Repeat count (0 for infinite) [default: 4]
-      --src-addr <SRC_ADDR>  Source IP Address [default: 0.0.0.0]
-      --src-port <SRC_PORT>  Source port (0 detects random unused high port between 1024-65534) [default: 0]
-  -t, --timeout <TIMEOUT>    Connection timeout (in milliseconds) [default: 5000]
-  -j, --json                 Log to file in JSON format
-  -s, --syslog               Log to file in SYSLOG format
-  -q, --quiet                Silence terminal output
+  -r, --repeat <REPEAT>      Repeat count (0 == max == 65535) [default: 4]
+  -S, --src-ip <SRC_IP>      Source IP Address [default: 0.0.0.0]
+  -P, --src-port <SRC_PORT>  Source port (0 detects random unused high port between 1024-65534) [default: 0]
+  -t, --timeout <TIMEOUT>    Connection timeout (in milliseconds) [default: 3000]
   -l, --listen               Listen as a server
+  -j, --json                 Log to file in JSON format
+  -n, --nk-peer              NetKraken peer messaging
+  -q, --quiet                Silence terminal output
+  -s, --syslog               Log to file in SYSLOG format
   -h, --help                 Print help
   -V, --version              Print version
 ```
@@ -49,4 +65,3 @@ ncat -l -k -v 127.0.0.1 8080 --sh-exec "echo ''"
 ```
 ncat -l -u -k -v 127.0.0.1 8080 --sh-exec "echo ''"
 ```
-
