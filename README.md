@@ -6,9 +6,9 @@ of the world.
 > # 🚧 work in progress 🚧
 
 ## Goals
- - Cross platform support, with Windows as a first class citizen
- - All clients and servers have Async support
- - Rapidly prove which of the trinity of evil (Network/Firewall/DNS) is causing connectivity issues
+ 1) Rapidly prove which of the trinity of evil (Network/Firewall/DNS) is causing connectivity issues
+ 2) Async all the things for massive concurrency
+ 3) Cross platform support, with Windows as a first class citizen
 
 ## Current Features
  - TCP/UDP Client/Server 
