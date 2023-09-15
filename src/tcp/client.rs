@@ -105,7 +105,7 @@ impl TcpClient {
                 false => count += 1,
             }
 
-            let mut host_results: Vec<HostResults> = futures::stream::iter(resolved_hosts.clone())
+            let host_results: Vec<HostResults> = futures::stream::iter(resolved_hosts.clone())
                 .map(|host_record| {
                     let src_ip_port = src_ip_port.clone();
                     async move {
@@ -117,7 +117,6 @@ impl TcpClient {
                 .collect()
                 .await;
 
-            host_results.sort_by_key(|h| h.host.to_owned());
             for host in host_results {
                 for result in host.results {
                     results_map
@@ -147,6 +146,7 @@ impl TcpClient {
                 client_results.push(summary_msg)
             }
         }
+        client_results.sort_by_key(|x| x.destination.to_owned());
 
         let summary_table = client_summary_table_msg(
             &self.dst_ip,
