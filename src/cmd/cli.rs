@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 
 use crate::core::common::{ConnectMethod, ListenOptions, OutputOptions, PingOptions};
-use crate::core::konst::{LOGFILE_DIR, LOGFILE_NAME};
+use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, LOGFILE_DIR, LOGFILE_NAME};
 use crate::tcp::client::TcpClient;
 use crate::tcp::server::TcpServer;
 use crate::udp::client::UdpClient;
@@ -43,9 +43,13 @@ pub struct Cli {
     #[clap(short, long, default_value_t = 4)]
     pub repeat: u16,
 
-    /// Source IP Address
-    #[clap(short = 'S', long, default_value = "0.0.0.0")]
-    pub src_ip: String,
+    /// Source IPv4 Address
+    #[clap(short = '4', long, default_value = BIND_ADDR_IPV4)]
+    pub src_ipv4: String,
+
+    /// Source IPv6 Address
+    #[clap(short = '6', long, default_value = BIND_ADDR_IPV6)]
+    pub src_ipv6: String,
 
     /// Source port (0 detects random unused high port between 1024-65534)
     #[clap(short = 'P', long, default_value_t = 0)]
@@ -122,7 +126,8 @@ impl Cli {
                     let tcp_client = TcpClient::new(
                         cli.dst_host,
                         cli.dst_port,
-                        Some(cli.src_ip),
+                        Some(cli.src_ipv4),
+                        Some(cli.src_ipv6),
                         Some(cli.src_port),
                         output_options,
                         ping_options,
@@ -143,7 +148,7 @@ impl Cli {
                     let udp_client = UdpClient::new(
                         cli.dst_host,
                         cli.dst_port,
-                        Some(cli.src_ip),
+                        Some(cli.src_ipv4),
                         Some(cli.src_port),
                         output_options,
                         ping_options,

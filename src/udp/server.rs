@@ -5,7 +5,7 @@ use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 
 use crate::core::common::{ConnectMethod, ConnectResult, ListenOptions, LogLevel, OutputOptions};
-use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
+use crate::core::konst::{BIND_ADDR_IPV4, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::output_handler;
 use crate::util::message::{server_conn_success_msg, server_start_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
@@ -103,7 +103,7 @@ impl UdpServer {
 impl Default for UdpServer {
     fn default() -> Self {
         Self {
-            listen_ip: BIND_ADDR.to_owned(),
+            listen_ip: BIND_ADDR_IPV4.to_owned(),
             listen_port: BIND_PORT,
             output_options: OutputOptions::default(),
             listen_options: ListenOptions::default(),

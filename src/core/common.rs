@@ -314,6 +314,13 @@ mod tests {
 }
 
 #[derive(Debug, Clone)]
+pub struct IpPort2 {
+    pub ipv4: IpAddr,
+    pub ipv6: IpAddr,
+    pub port: u16,
+}
+
+#[derive(Debug, Clone)]
 pub struct IpPort {
     pub ip: IpAddr,
     pub port: u16,

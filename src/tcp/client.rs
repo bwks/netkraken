@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
@@ -10,9 +10,9 @@ use tokio::time::{timeout, Duration};
 
 use crate::core::common::{
     ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord,
-    HostResults, IpPort, OutputOptions, PingOptions,
+    HostResults, IpPort2, OutputOptions, PingOptions,
 };
-use crate::core::konst::{BIND_ADDR, BIND_PORT, BUFFER_SIZE};
+use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE};
 use crate::util::dns::resolve_host;
 use crate::util::handler::{io_error_switch_handler, loop_handler, output_handler2};
 use crate::util::message::{
@@ -26,7 +26,8 @@ use crate::util::time::{calc_connect_ms, time_now_us};
 pub struct TcpClient {
     pub dst_ip: String,
     pub dst_port: u16,
-    pub src_ip: String,
+    pub src_ipv4: Option<IpAddr>,
+    pub src_ipv6: Option<IpAddr>,
     pub src_port: u16,
     pub output_options: OutputOptions,
     pub ping_options: PingOptions,
@@ -36,23 +37,29 @@ impl TcpClient {
     pub fn new(
         dst_ip: String,
         dst_port: u16,
-        src_ip: Option<String>,
+        src_ipv4: Option<String>,
+        src_ipv6: Option<String>,
         src_port: Option<u16>,
         output_options: OutputOptions,
         ping_options: PingOptions,
     ) -> TcpClient {
-        let src_ip = match src_ip {
-            Some(x) => x,
-            None => BIND_ADDR.to_owned(),
+        let src_ipv4 = match src_ipv4 {
+            Some(x) => parse_ipaddr(&x).ok(),
+            None => parse_ipaddr(BIND_ADDR_IPV4).ok(),
         };
-        let src_port = match src_port {
-            Some(x) => x,
-            None => BIND_PORT,
+
+        let src_ipv6 = match src_ipv6 {
+            Some(x) => parse_ipaddr(&x).ok(),
+            None => parse_ipaddr(BIND_ADDR_IPV6).ok(),
         };
+
+        let src_port = src_port.unwrap_or(BIND_PORT);
+
         TcpClient {
             dst_ip,
             dst_port,
-            src_ip,
+            src_ipv4,
+            src_ipv6,
             src_port,
             output_options,
             ping_options,
@@ -60,8 +67,10 @@ impl TcpClient {
     }
 
     pub async fn connect(&self) -> Result<()> {
-        let src_ip_port = IpPort {
-            ip: parse_ipaddr(&self.src_ip)?,
+        let src_ip_port = IpPort2 {
+            // These should never be None
+            ipv4: self.src_ipv4.unwrap(),
+            ipv6: self.src_ipv6.unwrap(),
             port: self.src_port,
         };
 
@@ -161,7 +170,7 @@ impl TcpClient {
 }
 
 async fn process_host(
-    src_ip_port: IpPort,
+    src_ip_port: IpPort2,
     host_record: HostRecord,
     ping_options: PingOptions,
 ) -> HostResults {
@@ -184,30 +193,32 @@ async fn process_host(
 }
 
 async fn connect_host(
-    src: IpPort,
+    src: IpPort2,
     dst_socket: SocketAddr,
     ping_options: PingOptions,
 ) -> ConnectRecord {
-    let bind_addr = SocketAddr::new(src.ip, src.port);
-    let src_socket = get_tcp_socket(bind_addr)
-        .await
-        // This should never fail unless:
-        // Every high port number socket is in use.
-        // Or, when trying to bind multiple source IPs
-        // to the same socket.
-        .unwrap_or_else(|_| panic!("ERROR BINDING TCP SOCKET ADDRESS {} {}", src.ip, src.port));
+    let bind_ipv4_addr = SocketAddr::new(src.ipv4, src.port);
+    let bind_ipv6_addr = SocketAddr::new(src.ipv6, src.port);
 
-    let local_addr = src_socket
-        .local_addr()
-        // This should never fail because we always
-        // pass a bound socket.
-        .unwrap_or_else(|_| panic!("ERROR GETTING TCP SOCKET LOCAL ADDRESS"))
-        .to_string();
+    let src_ipv4_socket = get_tcp_socket(bind_ipv4_addr).ok();
+    let src_ipv6_socket = get_tcp_socket(bind_ipv6_addr).ok();
+
+    if src_ipv4_socket.is_none() && src_ipv6_socket.is_none() {
+        panic!(
+            "ERROR BINDING TCP SOCKET ADDRESS TO IPv4 AND IPv6 {} | {} | {}",
+            src.ipv4, src.ipv4, src.port
+        );
+    }
+
+    let local_addr_ipv4 = match &src_ipv4_socket {
+        Some(s) => s.local_addr().unwrap().to_string(),
+        None => "".to_string(),
+    };
 
     let mut conn_record = ConnectRecord {
         result: ConnectResult::Unknown,
         protocol: ConnectMethod::TCP,
-        source: local_addr,
+        source: local_addr_ipv4,
         destination: dst_socket.to_string(),
         time: -1.0,
         success: false,
@@ -218,7 +229,7 @@ async fn connect_host(
     let pre_conn_timestamp = time_now_us();
 
     let tick = Duration::from_millis(ping_options.timeout.into());
-    match timeout(tick, src_socket.connect(dst_socket)).await {
+    match timeout(tick, src_ipv4_socket.unwrap().connect(dst_socket)).await {
         Ok(s) => match s {
             Ok(stream) => {
                 // Update conn record
@@ -256,7 +267,7 @@ async fn connect_host(
     conn_record
 }
 
-async fn get_tcp_socket(bind_addr: SocketAddr) -> Result<TcpSocket> {
+fn get_tcp_socket(bind_addr: SocketAddr) -> Result<TcpSocket> {
     let socket = match bind_addr.is_ipv4() {
         true => TcpSocket::new_v4()?,
         false => TcpSocket::new_v6()?,

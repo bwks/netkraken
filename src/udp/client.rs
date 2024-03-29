@@ -12,7 +12,7 @@ use crate::core::common::{
     ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord,
     HostResults, IpPort, OutputOptions, PingOptions,
 };
-use crate::core::konst::{BIND_ADDR, BIND_PORT, BUFFER_SIZE, MAX_PACKET_SIZE, PING_MSG};
+use crate::core::konst::{BIND_ADDR_IPV4, BIND_PORT, BUFFER_SIZE, MAX_PACKET_SIZE, PING_MSG};
 use crate::util::dns::resolve_host;
 use crate::util::handler::{io_error_switch_handler, loop_handler, output_handler2};
 use crate::util::message::{
@@ -43,7 +43,7 @@ impl UdpClient {
         UdpClient {
             dst_ip,
             dst_port,
-            src_ip: src_ip.unwrap_or_else(|| BIND_ADDR.to_owned()),
+            src_ip: src_ip.unwrap_or_else(|| BIND_ADDR_IPV4.to_owned()),
             src_port: src_port.unwrap_or_else(|| BIND_PORT.to_owned()),
             output_options,
             ping_options,
