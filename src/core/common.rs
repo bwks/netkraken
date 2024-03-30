@@ -20,6 +20,9 @@ pub enum ConnectResult {
     Reset,
     Timeout,
     Unknown,
+
+    // Bind Error
+    BindError,
 }
 impl Display for ConnectResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -30,6 +33,7 @@ impl Display for ConnectResult {
             ConnectResult::Reset => write!(f, "reset"),
             ConnectResult::Timeout => write!(f, "timeout"),
             ConnectResult::Unknown => write!(f, "unknown"),
+            ConnectResult::BindError => write!(f, "bind_error"),
         }
     }
 }
@@ -55,6 +59,24 @@ impl Display for ConnectMethod {
     }
 }
 
+#[derive(ValueEnum, Copy, Clone, Debug, Default, Serialize)]
+pub enum IpProtocol {
+    #[default]
+    All,
+    V4,
+    V6,
+}
+
+impl Display for IpProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IpProtocol::All => write!(f, "all"),
+            IpProtocol::V4 => write!(f, "v4"),
+            IpProtocol::V6 => write!(f, "v6"),
+        }
+    }
+}
+
 #[allow(dead_code, clippy::upper_case_acronyms)]
 pub enum LogLevel {
     DEBUG,
@@ -62,6 +84,11 @@ pub enum LogLevel {
     INFO,
     WARN,
     TRACE,
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct IpOptions {
+    pub ip_protocol: IpProtocol,
 }
 
 #[derive(Copy, Clone, Debug, Default)]

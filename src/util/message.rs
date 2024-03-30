@@ -73,7 +73,8 @@ pub fn client_result_msg(record: &ConnectRecord) -> String {
         ConnectResult::Refused
         | ConnectResult::Reset
         | ConnectResult::Timeout
-        | ConnectResult::Unknown => {
+        | ConnectResult::Unknown
+        | ConnectResult::BindError => {
             format!(
                 "{} => proto={} src={} dst={}",
                 record.result,

@@ -1,7 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
 
-use crate::core::common::{ConnectMethod, ListenOptions, OutputOptions, PingOptions};
+use crate::core::common::{
+    ConnectMethod, IpOptions, IpProtocol, ListenOptions, OutputOptions, PingOptions,
+};
 use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, LOGFILE_DIR, LOGFILE_NAME};
 use crate::tcp::client::TcpClient;
 use crate::tcp::server::TcpServer;
@@ -42,6 +44,10 @@ pub struct Cli {
     /// Repeat count (0 == max == 65535)
     #[clap(short, long, default_value_t = 4)]
     pub repeat: u16,
+
+    /// IP Protocol
+    #[clap(short = 'I', long, default_value_t = IpProtocol::All)]
+    pub ip_proto: IpProtocol,
 
     /// Source IPv4 Address
     #[clap(short = '4', long, default_value = BIND_ADDR_IPV4)]
@@ -94,6 +100,10 @@ impl Cli {
         println!("{header_msg}");
         let cli = Cli::parse();
 
+        let ip_options = IpOptions {
+            ip_protocol: cli.ip_proto,
+        };
+
         let ping_options = PingOptions {
             repeat: cli.repeat,
             interval: cli.interval,
@@ -131,6 +141,7 @@ impl Cli {
                         Some(cli.src_port),
                         output_options,
                         ping_options,
+                        ip_options,
                     );
                     tcp_client.connect().await?;
                 }
