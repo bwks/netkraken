@@ -10,7 +10,7 @@ use tokio::time::{timeout, Duration};
 
 use crate::core::common::{
     ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord,
-    HostResults, IpOptions, IpPort2, IpProtocol, OutputOptions, PingOptions,
+    HostResults, IpOptions, IpPort, IpProtocol, OutputOptions, PingOptions,
 };
 use crate::core::konst::{
     BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE, MAX_PACKET_SIZE, PING_MSG,
@@ -72,8 +72,8 @@ impl UdpClient {
     }
 
     pub async fn connect(&self) -> Result<()> {
-        let src_ip_port = IpPort2 {
-            // These should never be None at this point as they are set in the TcpClient::new() constructor.
+        let src_ip_port = IpPort {
+            // These should never be None at this point as they are set in the UdpClient::new() constructor.
             ipv4: self.src_ipv4.unwrap(),
             ipv6: self.src_ipv6.unwrap(),
             port: self.src_port,
@@ -84,7 +84,7 @@ impl UdpClient {
         let hosts = vec![host_records.clone()];
         let resolved_hosts = resolve_host(hosts).await;
 
-        // Check if the host resolved to an6 IPv4 or IPv6 addresses.
+        // Check if the host resolved to an IPv4 or IPv6 addresses.
         // If not, return an error.
         for record in &resolved_hosts {
             match record.ipv4_sockets.is_empty() && record.ipv6_sockets.is_empty() {
@@ -199,7 +199,7 @@ impl UdpClient {
 }
 
 async fn process_host(
-    src_ip_port: IpPort2,
+    src_ip_port: IpPort,
     host_record: HostRecord,
     ping_options: PingOptions,
     ip_options: IpOptions,
@@ -230,7 +230,7 @@ async fn process_host(
 }
 
 async fn connect_host(
-    src: IpPort2,
+    src: IpPort,
     dst_socket: SocketAddr,
     ping_options: PingOptions,
 ) -> ConnectRecord {
