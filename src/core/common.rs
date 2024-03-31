@@ -20,6 +20,9 @@ pub enum ConnectResult {
     Reset,
     Timeout,
     Unknown,
+
+    // Bind Error
+    BindError,
 }
 impl Display for ConnectResult {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -30,6 +33,7 @@ impl Display for ConnectResult {
             ConnectResult::Reset => write!(f, "reset"),
             ConnectResult::Timeout => write!(f, "timeout"),
             ConnectResult::Unknown => write!(f, "unknown"),
+            ConnectResult::BindError => write!(f, "bind_error"),
         }
     }
 }
@@ -55,6 +59,24 @@ impl Display for ConnectMethod {
     }
 }
 
+#[derive(ValueEnum, Copy, Clone, Debug, Default, Serialize)]
+pub enum IpProtocol {
+    #[default]
+    All,
+    IP4,
+    IP6,
+}
+
+impl Display for IpProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            IpProtocol::All => write!(f, "all"),
+            IpProtocol::IP4 => write!(f, "ip4"),
+            IpProtocol::IP6 => write!(f, "ip6"),
+        }
+    }
+}
+
 #[allow(dead_code, clippy::upper_case_acronyms)]
 pub enum LogLevel {
     DEBUG,
@@ -62,6 +84,11 @@ pub enum LogLevel {
     INFO,
     WARN,
     TRACE,
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub struct IpOptions {
+    pub ip_protocol: IpProtocol,
 }
 
 #[derive(Copy, Clone, Debug, Default)]
@@ -282,6 +309,19 @@ impl Display for HostRecord {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct IpPort {
+    pub ipv4: IpAddr,
+    pub ipv6: IpAddr,
+    pub port: u16,
+}
+
+#[derive(Debug, Clone)]
+pub struct HostResults {
+    pub host: String,
+    pub results: Vec<ConnectRecord>,
+}
+
 #[cfg(test)]
 mod tests {
     use crate::core::common::HostRecord;
@@ -309,18 +349,6 @@ mod tests {
         let host_record = HostRecord::new(domain, port).await;
 
         assert!(!host_record.ipv4_sockets.is_empty());
-        // assert!(!host_record.ipv6_sockets.is_empty()); // not sure why this is failing
+        assert!(!host_record.ipv6_sockets.is_empty());
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct IpPort {
-    pub ip: IpAddr,
-    pub port: u16,
-}
-
-#[derive(Debug, Clone)]
-pub struct HostResults {
-    pub host: String,
-    pub results: Vec<ConnectRecord>,
 }

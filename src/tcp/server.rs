@@ -5,7 +5,7 @@ use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 
 use crate::core::common::{ConnectMethod, ConnectResult, ListenOptions, LogLevel, OutputOptions};
-use crate::core::konst::{BIND_ADDR, BIND_PORT, MAX_PACKET_SIZE};
+use crate::core::konst::{BIND_ADDR_IPV4, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::output_handler;
 use crate::util::message::{server_conn_success_msg, server_start_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
@@ -21,11 +21,12 @@ pub struct TcpServer {
 impl TcpServer {
     pub async fn listen(&self) -> Result<()> {
         let listen_ip = parse_ipaddr(&self.listen_ip)?;
+
         let bind_addr = format!("{}:{}", listen_ip, self.listen_port);
 
         let listener = TcpListener::bind(&bind_addr).await?;
 
-        let start_msg = server_start_msg(ConnectMethod::TCP, &bind_addr);
+        let start_msg = server_start_msg(ConnectMethod::TCP, &listen_ip, &self.listen_port);
         println!("{}", start_msg);
 
         loop {
@@ -90,7 +91,7 @@ impl TcpServer {
 impl Default for TcpServer {
     fn default() -> Self {
         Self {
-            listen_ip: BIND_ADDR.to_owned(),
+            listen_ip: BIND_ADDR_IPV4.to_owned(),
             listen_port: BIND_PORT,
             output_options: OutputOptions::default(),
             listen_options: ListenOptions::default(),

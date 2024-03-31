@@ -1,8 +1,10 @@
 use anyhow::Result;
 use clap::Parser;
 
-use crate::core::common::{ConnectMethod, ListenOptions, OutputOptions, PingOptions};
-use crate::core::konst::{LOGFILE_DIR, LOGFILE_NAME};
+use crate::core::common::{
+    ConnectMethod, IpOptions, IpProtocol, ListenOptions, OutputOptions, PingOptions,
+};
+use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, LOGFILE_DIR, LOGFILE_NAME};
 use crate::tcp::client::TcpClient;
 use crate::tcp::server::TcpServer;
 use crate::udp::client::UdpClient;
@@ -15,13 +17,12 @@ use crate::util::message::cli_header_msg;
 #[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "NetKraken - Cross platform network connectivity tester", long_about = None)]
 pub struct Cli {
-    /// Destination hostname or IP address ||
-    /// Listen address in `-l --listen` mode
-    pub dst_host: String,
+    /// Destination hostname or IP address
+    pub host: String,
 
-    /// Destination port ||
+    /// Destination port or
     /// Listen port in `-l --listen` mode
-    pub dst_port: u16,
+    pub port: u16,
 
     /// Logging directory
     #[clap(short, long, default_value = LOGFILE_DIR)]
@@ -43,9 +44,17 @@ pub struct Cli {
     #[clap(short, long, default_value_t = 4)]
     pub repeat: u16,
 
-    /// Source IP Address
-    #[clap(short = 'S', long, default_value = "0.0.0.0")]
-    pub src_ip: String,
+    /// IP Protocol
+    #[clap(short = 'I', long, default_value_t = IpProtocol::All)]
+    pub ip_proto: IpProtocol,
+
+    /// Source IPv4 Address
+    #[clap(short = '4', long, default_value = BIND_ADDR_IPV4)]
+    pub src_ip4: String,
+
+    /// Source IPv6 Address
+    #[clap(short = '6', long, default_value = BIND_ADDR_IPV6)]
+    pub src_ip6: String,
 
     /// Source port (0 detects random unused high port between 1024-65534)
     #[clap(short = 'P', long, default_value_t = 0)]
@@ -90,6 +99,10 @@ impl Cli {
         println!("{header_msg}");
         let cli = Cli::parse();
 
+        let ip_options = IpOptions {
+            ip_protocol: cli.ip_proto,
+        };
+
         let ping_options = PingOptions {
             repeat: cli.repeat,
             interval: cli.interval,
@@ -112,20 +125,22 @@ impl Cli {
             ConnectMethod::TCP => {
                 if cli.listen {
                     let tcp_server = TcpServer {
-                        listen_ip: cli.dst_host,
-                        listen_port: cli.dst_port,
+                        listen_ip: cli.host,
+                        listen_port: cli.port,
                         output_options,
                         listen_options,
                     };
                     tcp_server.listen().await?;
                 } else {
                     let tcp_client = TcpClient::new(
-                        cli.dst_host,
-                        cli.dst_port,
-                        Some(cli.src_ip),
+                        cli.host,
+                        cli.port,
+                        Some(cli.src_ip4),
+                        Some(cli.src_ip6),
                         Some(cli.src_port),
                         output_options,
                         ping_options,
+                        ip_options,
                     );
                     tcp_client.connect().await?;
                 }
@@ -133,20 +148,22 @@ impl Cli {
             ConnectMethod::UDP => {
                 if cli.listen {
                     let udp_server = UdpServer {
-                        listen_ip: cli.dst_host,
-                        listen_port: cli.dst_port,
+                        listen_ip: cli.host,
+                        listen_port: cli.port,
                         output_options,
                         listen_options,
                     };
                     udp_server.listen().await?;
                 } else {
                     let udp_client = UdpClient::new(
-                        cli.dst_host,
-                        cli.dst_port,
-                        Some(cli.src_ip),
+                        cli.host,
+                        cli.port,
+                        Some(cli.src_ip4),
+                        Some(cli.src_ip6),
                         Some(cli.src_port),
                         output_options,
                         ping_options,
+                        ip_options,
                     );
                     udp_client.connect().await?;
                 }
