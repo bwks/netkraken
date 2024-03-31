@@ -309,6 +309,19 @@ impl Display for HostRecord {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct IpPort {
+    pub ipv4: IpAddr,
+    pub ipv6: IpAddr,
+    pub port: u16,
+}
+
+#[derive(Debug, Clone)]
+pub struct HostResults {
+    pub host: String,
+    pub results: Vec<ConnectRecord>,
+}
+
 #[cfg(test)]
 mod tests {
     use crate::core::common::HostRecord;
@@ -336,19 +349,6 @@ mod tests {
         let host_record = HostRecord::new(domain, port).await;
 
         assert!(!host_record.ipv4_sockets.is_empty());
-        // assert!(!host_record.ipv6_sockets.is_empty()); // not sure why this is failing
+        assert!(!host_record.ipv6_sockets.is_empty());
     }
-}
-
-#[derive(Debug, Clone)]
-pub struct IpPort {
-    pub ipv4: IpAddr,
-    pub ipv6: IpAddr,
-    pub port: u16,
-}
-
-#[derive(Debug, Clone)]
-pub struct HostResults {
-    pub host: String,
-    pub results: Vec<ConnectRecord>,
 }
