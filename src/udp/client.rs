@@ -241,13 +241,23 @@ async fn connect_host(
         false => SocketAddr::new(src.ipv6, src.port),
     };
 
-    let socket = UdpSocket::bind(bind_addr)
-        .await
-        // This should never fail because we always
-        // pass a bound socket. (Not sure with UDP sockets)
-        .unwrap_or_else(|_| panic!("ERROR GETTING UDP SOCKET LOCAL ADDRESS"));
+    let src_socket = UdpSocket::bind(bind_addr).await.ok();
 
-    let reader = Arc::new(socket);
+    if src_socket.is_none() {
+        return ConnectRecord {
+            result: ConnectResult::BindError,
+            protocol: ConnectMethod::UDP,
+            source: bind_addr.to_string(),
+            destination: dst_socket.to_string(),
+            time: -1.0,
+            success: false,
+            error_msg: None,
+        };
+    }
+    // Unwrap the socket because we have already checked that it is not None.
+    let src_socket = src_socket.unwrap();
+
+    let reader = Arc::new(src_socket);
     let writer = reader.clone();
 
     // TODO: this should never fail
