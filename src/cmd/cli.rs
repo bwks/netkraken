@@ -126,7 +126,8 @@ impl Cli {
             ConnectMethod::TCP => {
                 if cli.listen {
                     let tcp_server = TcpServer {
-                        listen_ip: cli.dst_host,
+                        listen_ipv4: cli.dst_host,
+                        listen_ipv6: BIND_ADDR_IPV6.to_string(),
                         listen_port: cli.dst_port,
                         output_options,
                         listen_options,
