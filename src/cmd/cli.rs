@@ -159,9 +159,11 @@ impl Cli {
                         cli.host,
                         cli.port,
                         Some(cli.src_ip4),
+                        Some(cli.src_ip6),
                         Some(cli.src_port),
                         output_options,
                         ping_options,
+                        ip_options,
                     );
                     udp_client.connect().await?;
                 }

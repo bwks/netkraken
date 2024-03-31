@@ -29,7 +29,8 @@ impl UdpServer {
         let writer = reader.clone();
         let (tx_chan, mut rx_chan) = mpsc::channel::<(Vec<u8>, SocketAddr)>(1);
 
-        server_start_msg(ConnectMethod::UDP, &listen_ip, &self.listen_port);
+        let start_msg = server_start_msg(ConnectMethod::UDP, &listen_ip, &self.listen_port);
+        println!("{}", start_msg);
 
         tokio::spawn(async move {
             while let Some((bytes, addr)) = rx_chan.recv().await {
