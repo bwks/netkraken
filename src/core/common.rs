@@ -63,16 +63,16 @@ impl Display for ConnectMethod {
 pub enum IpProtocol {
     #[default]
     All,
-    V4,
-    V6,
+    IP4,
+    IP6,
 }
 
 impl Display for IpProtocol {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             IpProtocol::All => write!(f, "all"),
-            IpProtocol::V4 => write!(f, "v4"),
-            IpProtocol::V6 => write!(f, "v6"),
+            IpProtocol::IP4 => write!(f, "ip4"),
+            IpProtocol::IP6 => write!(f, "ip6"),
         }
     }
 }

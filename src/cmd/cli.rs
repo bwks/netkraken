@@ -17,13 +17,12 @@ use crate::util::message::cli_header_msg;
 #[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(about = "NetKraken - Cross platform network connectivity tester", long_about = None)]
 pub struct Cli {
-    /// Destination hostname or IP address ||
-    /// Listen address in `-l --listen` mode
-    pub dst_host: String,
+    /// Destination hostname or IP address
+    pub host: String,
 
-    /// Destination port ||
+    /// Destination port or
     /// Listen port in `-l --listen` mode
-    pub dst_port: u16,
+    pub port: u16,
 
     /// Logging directory
     #[clap(short, long, default_value = LOGFILE_DIR)]
@@ -51,11 +50,11 @@ pub struct Cli {
 
     /// Source IPv4 Address
     #[clap(short = '4', long, default_value = BIND_ADDR_IPV4)]
-    pub src_ipv4: String,
+    pub src_ip4: String,
 
     /// Source IPv6 Address
     #[clap(short = '6', long, default_value = BIND_ADDR_IPV6)]
-    pub src_ipv6: String,
+    pub src_ip6: String,
 
     /// Source port (0 detects random unused high port between 1024-65534)
     #[clap(short = 'P', long, default_value_t = 0)]
@@ -126,19 +125,18 @@ impl Cli {
             ConnectMethod::TCP => {
                 if cli.listen {
                     let tcp_server = TcpServer {
-                        listen_ipv4: cli.dst_host,
-                        listen_ipv6: BIND_ADDR_IPV6.to_string(),
-                        listen_port: cli.dst_port,
+                        listen_ip: cli.host,
+                        listen_port: cli.port,
                         output_options,
                         listen_options,
                     };
                     tcp_server.listen().await?;
                 } else {
                     let tcp_client = TcpClient::new(
-                        cli.dst_host,
-                        cli.dst_port,
-                        Some(cli.src_ipv4),
-                        Some(cli.src_ipv6),
+                        cli.host,
+                        cli.port,
+                        Some(cli.src_ip4),
+                        Some(cli.src_ip6),
                         Some(cli.src_port),
                         output_options,
                         ping_options,
@@ -150,17 +148,17 @@ impl Cli {
             ConnectMethod::UDP => {
                 if cli.listen {
                     let udp_server = UdpServer {
-                        listen_ip: cli.dst_host,
-                        listen_port: cli.dst_port,
+                        listen_ip: cli.host,
+                        listen_port: cli.port,
                         output_options,
                         listen_options,
                     };
                     udp_server.listen().await?;
                 } else {
                     let udp_client = UdpClient::new(
-                        cli.dst_host,
-                        cli.dst_port,
-                        Some(cli.src_ipv4),
+                        cli.host,
+                        cli.port,
+                        Some(cli.src_ip4),
                         Some(cli.src_port),
                         output_options,
                         ping_options,

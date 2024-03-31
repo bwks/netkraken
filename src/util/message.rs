@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 
 use tabled::settings::Panel;
 use tabled::settings::{object::Rows, Alignment, Margin, Modify, Span, Style};
@@ -12,12 +12,18 @@ pub fn cli_header_msg() -> String {
 }
 
 /// Return server start message
-pub fn server_start_msg(protocol: ConnectMethod, bind_addr: &String) -> String {
+pub fn server_start_msg(protocol: ConnectMethod, bind_addr: &IpAddr, bind_port: &u16) -> String {
+    let addr = match bind_addr.is_ipv6() {
+        true => format!("[{}]", bind_addr),
+        false => bind_addr.to_string(),
+    };
+
     format!(
-        "{} server listening on {}\n\
+        "{} server listening on {}:{}\n\
         Press CRTL+C to exit\n",
         protocol.to_string().to_uppercase(),
-        &bind_addr
+        addr,
+        bind_port,
     )
 }
 
@@ -232,11 +238,13 @@ mod tests {
 
     #[test]
     fn server_start_msg_is_expected() {
-        let msg = server_start_msg(ConnectMethod::TCP, &"198.51.100.1:443".to_owned());
+        let listen_ip: IpAddr = "127.0.0.1".parse::<IpAddr>().unwrap();
+
+        let msg = server_start_msg(ConnectMethod::TCP, &listen_ip, &42069);
 
         assert_eq!(
             msg,
-            "TCP server listening on 198.51.100.1:443\nPress CRTL+C to exit\n".to_string()
+            "TCP server listening on 127.0.0.1:42069\nPress CRTL+C to exit\n".to_string()
         );
     }
 

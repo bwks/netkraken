@@ -35,6 +35,7 @@ pub struct TcpClient {
 }
 
 impl TcpClient {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         dst_ip: String,
         dst_port: u16,
@@ -102,11 +103,11 @@ impl TcpClient {
                 IpProtocol::All => {
                     filtered_hosts.push(record);
                 }
-                IpProtocol::V4 => {
+                IpProtocol::IP4 => {
                     record.ipv6_sockets.clear();
                     filtered_hosts.push(record);
                 }
-                IpProtocol::V6 => {
+                IpProtocol::IP6 => {
                     record.ipv4_sockets.clear();
                     filtered_hosts.push(record);
                 }
@@ -204,9 +205,9 @@ async fn process_host(
 ) -> HostResults {
     // Create a vector of sockets based on the IP protocol.
     let sockets = match ip_options.ip_protocol {
-        IpProtocol::All => vec![host_record.ipv4_sockets, host_record.ipv6_sockets].concat(),
-        IpProtocol::V4 => host_record.ipv4_sockets,
-        IpProtocol::V6 => host_record.ipv6_sockets,
+        IpProtocol::All => [host_record.ipv4_sockets, host_record.ipv6_sockets].concat(),
+        IpProtocol::IP4 => host_record.ipv4_sockets,
+        IpProtocol::IP6 => host_record.ipv6_sockets,
     };
 
     let results: Vec<ConnectRecord> = futures::stream::iter(sockets)
