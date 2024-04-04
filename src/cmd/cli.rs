@@ -44,16 +44,16 @@ pub struct Cli {
     #[clap(short, long, default_value_t = 4)]
     pub repeat: u16,
 
-    /// IP Protocol
-    #[clap(short = 'I', long, default_value_t = IpProtocol::All)]
+    /// IP Protocol to use
+    #[clap(short = 'I', long, default_value_t = IpProtocol::V4)]
     pub ip_proto: IpProtocol,
 
     /// Source IPv4 Address
-    #[clap(short = '4', long, default_value = BIND_ADDR_IPV4)]
+    #[clap(long, default_value = BIND_ADDR_IPV4)]
     pub src_ip4: String,
 
     /// Source IPv6 Address
-    #[clap(short = '6', long, default_value = BIND_ADDR_IPV6)]
+    #[clap(long, default_value = BIND_ADDR_IPV6)]
     pub src_ip6: String,
 
     /// Source port (0 detects random unused high port between 1024-65534)

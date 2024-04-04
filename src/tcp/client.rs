@@ -103,11 +103,11 @@ impl TcpClient {
                 IpProtocol::All => {
                     filtered_hosts.push(record);
                 }
-                IpProtocol::IP4 => {
+                IpProtocol::V4 => {
                     record.ipv6_sockets.clear();
                     filtered_hosts.push(record);
                 }
-                IpProtocol::IP6 => {
+                IpProtocol::V6 => {
                     record.ipv4_sockets.clear();
                     filtered_hosts.push(record);
                 }
@@ -206,8 +206,8 @@ async fn process_host(
     // Create a vector of sockets based on the IP protocol.
     let sockets = match ip_options.ip_protocol {
         IpProtocol::All => [host_record.ipv4_sockets, host_record.ipv6_sockets].concat(),
-        IpProtocol::IP4 => host_record.ipv4_sockets,
-        IpProtocol::IP6 => host_record.ipv6_sockets,
+        IpProtocol::V4 => host_record.ipv4_sockets,
+        IpProtocol::V6 => host_record.ipv6_sockets,
     };
 
     let results: Vec<ConnectRecord> = futures::stream::iter(sockets)
