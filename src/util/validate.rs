@@ -4,7 +4,7 @@ use anyhow::{bail, Result};
 
 use local_ip_address::list_afinet_netifas;
 
-/// Validate if the source IP address is a local interface IP address
+/// Validate that the source IP address is an IP address on a local interface.
 pub fn validate_local_ip(src_ip: &IpAddr) -> Result<()> {
     let network_interfaces = list_afinet_netifas()?;
 
