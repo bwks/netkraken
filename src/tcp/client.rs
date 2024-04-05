@@ -158,9 +158,9 @@ impl TcpClient {
                 for result in host.results {
                     results_map
                         .get_mut(&host.host)
-                        .unwrap()
+                        .unwrap() // TODO: handle unwrap or document
                         .get_mut(&result.destination)
-                        .unwrap()
+                        .unwrap() // TODO: handle unwrap or document
                         .push(result.time);
 
                     let success_msg = client_result_msg(&result);
@@ -179,7 +179,6 @@ impl TcpClient {
                     latencies,
                 };
                 let summary_msg = client_summary_result(&addr, ConnectMethod::TCP, client_summary);
-                // println!("{}", summary_msg);
                 client_results.push(summary_msg)
             }
         }
@@ -233,9 +232,8 @@ async fn connect_host(
     dst_socket: SocketAddr,
     ping_options: PingOptions,
 ) -> ConnectRecord {
-    let (_bind_addr, src_socket) = match &dst_socket.is_ipv4() {
+    let (bind_addr, src_socket) = match &dst_socket.is_ipv4() {
         // Bind the source socket to the same IP Version as the destination socket.
-        // If we get an error binding to the socket address we will panic.
         true => {
             let bind_ipv4_addr = SocketAddr::new(src.ipv4, src.port);
             let socket = get_tcp_socket(bind_ipv4_addr).ok();
@@ -248,21 +246,17 @@ async fn connect_host(
         }
     };
 
+    // If the source socket is None, we could not bind to the socket.
     if src_socket.is_none() {
-        let src_ip_port = match dst_socket.is_ipv4() {
-            true => format!("{}:{}", src.ipv4, src.port),
-            false => format!("[{}]:{}", src.ipv6, src.port),
+        return ConnectRecord {
+            result: ConnectResult::BindError,
+            protocol: ConnectMethod::TCP,
+            source: bind_addr.to_string(),
+            destination: dst_socket.to_string(),
+            time: -1.0,
+            success: false,
+            error_msg: Some("Error binding to socket".to_owned()),
         };
-        panic!("ERROR BINDING TO SOCKET {}", src_ip_port);
-        // return ConnectRecord {
-        //     result: ConnectResult::BindError,
-        //     protocol: ConnectMethod::TCP,
-        //     source: bind_addr.to_string(),
-        //     destination: dst_socket.to_string(),
-        //     time: -1.0,
-        //     success: false,
-        //     error_msg: Some("Error binding to socket".to_owned()),
-        // };
     }
     // Unwrap the socket because we have already checked that it is not None.
     let src_socket = src_socket.unwrap();

@@ -10,6 +10,7 @@ use crate::tcp::server::TcpServer;
 use crate::udp::client::UdpClient;
 use crate::udp::server::UdpServer;
 use crate::util::message::cli_header_msg;
+use crate::util::validate::validate_local_ip;
 
 #[derive(Debug, Parser)]
 #[command(name = "nk")]
@@ -118,6 +119,18 @@ impl Cli {
             quiet: cli.quiet,
             syslog: cli.syslog,
         };
+
+        // region:    ===== validators ===== //
+
+        // validate source IP addresses
+        if cli.src_v4 != BIND_ADDR_IPV4 {
+            validate_local_ip(&cli.src_v4.parse()?)?;
+        }
+        if cli.src_v6 != BIND_ADDR_IPV6 {
+            validate_local_ip(&cli.src_v6.parse()?)?;
+        }
+
+        // endregion: ===== validators ===== //
 
         match cli.method {
             ConnectMethod::HTTP => println!("http not implemented"),
