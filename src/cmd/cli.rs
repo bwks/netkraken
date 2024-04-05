@@ -50,11 +50,11 @@ pub struct Cli {
 
     /// Source IPv4 Address
     #[clap(long, default_value = BIND_ADDR_IPV4)]
-    pub src_ip4: String,
+    pub src_v4: String,
 
     /// Source IPv6 Address
     #[clap(long, default_value = BIND_ADDR_IPV6)]
-    pub src_ip6: String,
+    pub src_v6: String,
 
     /// Source port (0 detects random unused high port between 1024-65534)
     #[clap(short = 'P', long, default_value_t = 0)]
@@ -135,8 +135,8 @@ impl Cli {
                     let tcp_client = TcpClient::new(
                         cli.host,
                         cli.port,
-                        Some(cli.src_ip4),
-                        Some(cli.src_ip6),
+                        Some(cli.src_v4),
+                        Some(cli.src_v6),
                         Some(cli.src_port),
                         output_options,
                         ping_options,
@@ -158,8 +158,8 @@ impl Cli {
                     let udp_client = UdpClient::new(
                         cli.host,
                         cli.port,
-                        Some(cli.src_ip4),
-                        Some(cli.src_ip6),
+                        Some(cli.src_v4),
+                        Some(cli.src_v6),
                         Some(cli.src_port),
                         output_options,
                         ping_options,

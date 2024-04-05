@@ -233,7 +233,7 @@ async fn connect_host(
     dst_socket: SocketAddr,
     ping_options: PingOptions,
 ) -> ConnectRecord {
-    let (bind_addr, src_socket) = match &dst_socket.is_ipv4() {
+    let (_bind_addr, src_socket) = match &dst_socket.is_ipv4() {
         // Bind the source socket to the same IP Version as the destination socket.
         // If we get an error binding to the socket address we will panic.
         true => {
@@ -249,15 +249,20 @@ async fn connect_host(
     };
 
     if src_socket.is_none() {
-        return ConnectRecord {
-            result: ConnectResult::BindError,
-            protocol: ConnectMethod::TCP,
-            source: bind_addr.to_string(),
-            destination: dst_socket.to_string(),
-            time: -1.0,
-            success: false,
-            error_msg: Some("Error binding to socket".to_owned()),
+        let src_ip_port = match dst_socket.is_ipv4() {
+            true => format!("{}:{}", src.ipv4, src.port),
+            false => format!("[{}]:{}", src.ipv6, src.port),
         };
+        panic!("ERROR BINDING TO SOCKET {}", src_ip_port);
+        // return ConnectRecord {
+        //     result: ConnectResult::BindError,
+        //     protocol: ConnectMethod::TCP,
+        //     source: bind_addr.to_string(),
+        //     destination: dst_socket.to_string(),
+        //     time: -1.0,
+        //     success: false,
+        //     error_msg: Some("Error binding to socket".to_owned()),
+        // };
     }
     // Unwrap the socket because we have already checked that it is not None.
     let src_socket = src_socket.unwrap();
