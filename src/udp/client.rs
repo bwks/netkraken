@@ -104,11 +104,11 @@ impl UdpClient {
                 IpProtocol::All => {
                     filtered_hosts.push(record);
                 }
-                IpProtocol::IP4 => {
+                IpProtocol::V4 => {
                     record.ipv6_sockets.clear();
                     filtered_hosts.push(record);
                 }
-                IpProtocol::IP6 => {
+                IpProtocol::V6 => {
                     record.ipv4_sockets.clear();
                     filtered_hosts.push(record);
                 }
@@ -207,8 +207,8 @@ async fn process_host(
     // Create a vector of sockets based on the IP protocol.
     let sockets = match ip_options.ip_protocol {
         IpProtocol::All => [host_record.ipv4_sockets, host_record.ipv6_sockets].concat(),
-        IpProtocol::IP4 => host_record.ipv4_sockets,
-        IpProtocol::IP6 => host_record.ipv6_sockets,
+        IpProtocol::V4 => host_record.ipv4_sockets,
+        IpProtocol::V6 => host_record.ipv6_sockets,
     };
 
     let results: Vec<ConnectRecord> = futures::stream::iter(sockets)
@@ -236,13 +236,13 @@ async fn connect_host(
 ) -> ConnectRecord {
     let bind_addr = match &dst_socket.is_ipv4() {
         // Bind the source socket to the same IP Version as the destination socket.
-        // If we get an error binding to the socket address we will panic.
         true => SocketAddr::new(src.ipv4, src.port),
         false => SocketAddr::new(src.ipv6, src.port),
     };
 
     let src_socket = UdpSocket::bind(bind_addr).await.ok();
 
+    // If the source socket is None, we could not bind to the socket.
     if src_socket.is_none() {
         return ConnectRecord {
             result: ConnectResult::BindError,
@@ -260,7 +260,7 @@ async fn connect_host(
     let reader = Arc::new(src_socket);
     let writer = reader.clone();
 
-    // TODO: this should never fail
+    // TODO: this should never fail, validate this assumption.
     let local_addr = &writer.local_addr().unwrap().to_string();
 
     let mut conn_record = ConnectRecord {

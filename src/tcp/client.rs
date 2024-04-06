@@ -103,11 +103,11 @@ impl TcpClient {
                 IpProtocol::All => {
                     filtered_hosts.push(record);
                 }
-                IpProtocol::IP4 => {
+                IpProtocol::V4 => {
                     record.ipv6_sockets.clear();
                     filtered_hosts.push(record);
                 }
-                IpProtocol::IP6 => {
+                IpProtocol::V6 => {
                     record.ipv4_sockets.clear();
                     filtered_hosts.push(record);
                 }
@@ -158,9 +158,9 @@ impl TcpClient {
                 for result in host.results {
                     results_map
                         .get_mut(&host.host)
-                        .unwrap()
+                        .unwrap() // TODO: handle unwrap or document
                         .get_mut(&result.destination)
-                        .unwrap()
+                        .unwrap() // TODO: handle unwrap or document
                         .push(result.time);
 
                     let success_msg = client_result_msg(&result);
@@ -179,7 +179,6 @@ impl TcpClient {
                     latencies,
                 };
                 let summary_msg = client_summary_result(&addr, ConnectMethod::TCP, client_summary);
-                // println!("{}", summary_msg);
                 client_results.push(summary_msg)
             }
         }
@@ -206,8 +205,8 @@ async fn process_host(
     // Create a vector of sockets based on the IP protocol.
     let sockets = match ip_options.ip_protocol {
         IpProtocol::All => [host_record.ipv4_sockets, host_record.ipv6_sockets].concat(),
-        IpProtocol::IP4 => host_record.ipv4_sockets,
-        IpProtocol::IP6 => host_record.ipv6_sockets,
+        IpProtocol::V4 => host_record.ipv4_sockets,
+        IpProtocol::V6 => host_record.ipv6_sockets,
     };
 
     let results: Vec<ConnectRecord> = futures::stream::iter(sockets)
@@ -235,7 +234,6 @@ async fn connect_host(
 ) -> ConnectRecord {
     let (bind_addr, src_socket) = match &dst_socket.is_ipv4() {
         // Bind the source socket to the same IP Version as the destination socket.
-        // If we get an error binding to the socket address we will panic.
         true => {
             let bind_ipv4_addr = SocketAddr::new(src.ipv4, src.port);
             let socket = get_tcp_socket(bind_ipv4_addr).ok();
@@ -248,6 +246,7 @@ async fn connect_host(
         }
     };
 
+    // If the source socket is None, we could not bind to the socket.
     if src_socket.is_none() {
         return ConnectRecord {
             result: ConnectResult::BindError,

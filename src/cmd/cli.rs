@@ -10,6 +10,7 @@ use crate::tcp::server::TcpServer;
 use crate::udp::client::UdpClient;
 use crate::udp::server::UdpServer;
 use crate::util::message::cli_header_msg;
+use crate::util::validate::validate_local_ip;
 
 #[derive(Debug, Parser)]
 #[command(name = "nk")]
@@ -44,17 +45,17 @@ pub struct Cli {
     #[clap(short, long, default_value_t = 4)]
     pub repeat: u16,
 
-    /// IP Protocol
-    #[clap(short = 'I', long, default_value_t = IpProtocol::All)]
+    /// IP Protocol to use
+    #[clap(short = 'I', long, default_value_t = IpProtocol::V4)]
     pub ip_proto: IpProtocol,
 
     /// Source IPv4 Address
-    #[clap(short = '4', long, default_value = BIND_ADDR_IPV4)]
-    pub src_ip4: String,
+    #[clap(long, default_value = BIND_ADDR_IPV4)]
+    pub src_v4: String,
 
     /// Source IPv6 Address
-    #[clap(short = '6', long, default_value = BIND_ADDR_IPV6)]
-    pub src_ip6: String,
+    #[clap(long, default_value = BIND_ADDR_IPV6)]
+    pub src_v6: String,
 
     /// Source port (0 detects random unused high port between 1024-65534)
     #[clap(short = 'P', long, default_value_t = 0)]
@@ -119,6 +120,18 @@ impl Cli {
             syslog: cli.syslog,
         };
 
+        // region:    ===== validators ===== //
+
+        // validate source IP addresses
+        if cli.src_v4 != BIND_ADDR_IPV4 {
+            validate_local_ip(&cli.src_v4.parse()?)?;
+        }
+        if cli.src_v6 != BIND_ADDR_IPV6 {
+            validate_local_ip(&cli.src_v6.parse()?)?;
+        }
+
+        // endregion: ===== validators ===== //
+
         match cli.method {
             ConnectMethod::HTTP => println!("http not implemented"),
             ConnectMethod::ICMP => println!("icmp not implemented"),
@@ -135,8 +148,8 @@ impl Cli {
                     let tcp_client = TcpClient::new(
                         cli.host,
                         cli.port,
-                        Some(cli.src_ip4),
-                        Some(cli.src_ip6),
+                        Some(cli.src_v4),
+                        Some(cli.src_v6),
                         Some(cli.src_port),
                         output_options,
                         ping_options,
@@ -158,8 +171,8 @@ impl Cli {
                     let udp_client = UdpClient::new(
                         cli.host,
                         cli.port,
-                        Some(cli.src_ip4),
-                        Some(cli.src_ip6),
+                        Some(cli.src_v4),
+                        Some(cli.src_v6),
                         Some(cli.src_port),
                         output_options,
                         ping_options,
