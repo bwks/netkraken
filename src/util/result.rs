@@ -44,8 +44,7 @@ pub fn client_summary_result(
     latencies.retain(|f| f > &0.0);
 
     // Sort lowest to highest
-    // TODO: Fix this unwrap
-    latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
+    latencies.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
 
     if !latencies.is_empty() {
         min = *latencies.first().unwrap_or(&0.0);

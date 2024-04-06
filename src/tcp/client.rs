@@ -128,6 +128,7 @@ impl TcpClient {
         let cancel = Arc::new(AtomicBool::new(false));
         let c = cancel.clone();
         tokio::spawn(async move {
+            // TODO: this will eventually move to a channel signalling mechanism.
             signal::ctrl_c().await.unwrap();
             c.store(true, Ordering::SeqCst);
         });
@@ -157,10 +158,12 @@ impl TcpClient {
             for host in host_results {
                 for result in host.results {
                     results_map
+                        // This should never fail
                         .get_mut(&host.host)
-                        .unwrap() // TODO: handle unwrap or document
+                        .unwrap()
+                        // This should never fail
                         .get_mut(&result.destination)
-                        .unwrap() // TODO: handle unwrap or document
+                        .unwrap()
                         .push(result.time);
 
                     let success_msg = client_result_msg(&result);
