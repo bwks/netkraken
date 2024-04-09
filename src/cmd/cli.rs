@@ -4,7 +4,9 @@ use clap::Parser;
 use crate::core::common::{
     ConnectMethod, IpOptions, IpProtocol, ListenOptions, OutputOptions, PingOptions,
 };
-use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, LOGFILE_DIR, LOGFILE_NAME};
+use crate::core::konst::{
+    BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, INTERVAL, LOGFILE_DIR, LOGFILE_NAME, REPEAT, TIMEOUT,
+};
 use crate::tcp::client::TcpClient;
 use crate::tcp::server::TcpServer;
 use crate::udp::client::UdpClient;
@@ -34,7 +36,7 @@ pub struct Cli {
     pub file: String,
 
     /// Interval between pings (in milliseconds)
-    #[clap(short, long, default_value_t = 1000)]
+    #[clap(short, long, default_value_t = INTERVAL)]
     pub interval: u16,
 
     /// Connection Method
@@ -42,7 +44,7 @@ pub struct Cli {
     pub method: ConnectMethod,
 
     /// Repeat count (0 == max == 65535)
-    #[clap(short, long, default_value_t = 4)]
+    #[clap(short, long, default_value_t = REPEAT)]
     pub repeat: u16,
 
     /// IP Protocol to use
@@ -58,11 +60,11 @@ pub struct Cli {
     pub src_v6: String,
 
     /// Source port (0 detects random unused high port between 1024-65534)
-    #[clap(short = 'P', long, default_value_t = 0)]
+    #[clap(short = 'P', long, default_value_t = BIND_PORT)]
     pub src_port: u16,
 
     /// Connection timeout (in milliseconds)
-    #[clap(short, long, default_value_t = 3000)]
+    #[clap(short, long, default_value_t = TIMEOUT)]
     pub timeout: u16,
 
     // Server specific options

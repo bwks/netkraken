@@ -4,16 +4,34 @@ mod tcp;
 mod udp;
 mod util;
 
+use std::fs::File;
+use std::path::PathBuf;
 use std::process::ExitCode;
+
+use dirs::home_dir;
 
 use tracing::{event, Level};
 use tracing_appender::rolling;
 
 use crate::cmd::cli::Cli;
-use crate::core::konst::APP_NAME;
+use crate::core::konst::{APP_NAME, CONFIG_FILE};
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    let mut config_file = match home_dir() {
+        Some(c) => c,
+        None => {
+            event!(target: APP_NAME, Level::WARN, "UNABLE TO OPEN HOME DIR, USING CURRENT DIR");
+            PathBuf::from(".")
+        }
+    };
+    config_file.push(CONFIG_FILE);
+
+    // let config = match File::open(&config_file) {
+    //     Ok(x) => x,
+    //     Err => _,
+    // };
+
     let cli = Cli::init();
 
     let file_appender = rolling::never(&cli.dir, &cli.file);
