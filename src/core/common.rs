@@ -6,6 +6,7 @@ use clap::ValueEnum;
 use serde_derive::{Deserialize, Serialize};
 use tabled::Tabled;
 
+use crate::core::konst::{PING_INTERVAL, PING_NK_PEER, PING_REPEAT, PING_TIMEOUT};
 use crate::util::time::{time_now_us, time_now_utc};
 
 #[allow(dead_code)]
@@ -98,21 +99,21 @@ pub struct OutputOptions {
     pub syslog: bool,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct PingOptions {
     pub repeat: u16,
     pub interval: u16,
     pub timeout: u16,
-    pub nk_peer_messaging: bool,
+    pub nk_peer: bool,
 }
 
 impl Default for PingOptions {
     fn default() -> Self {
         Self {
-            repeat: 4,
-            interval: 1000,
-            timeout: 1000,
-            nk_peer_messaging: false,
+            repeat: PING_REPEAT,
+            interval: PING_INTERVAL,
+            timeout: PING_TIMEOUT,
+            nk_peer: PING_NK_PEER,
         }
     }
 }

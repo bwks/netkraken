@@ -9,17 +9,13 @@ use tokio::signal;
 use tokio::time::{timeout, Duration};
 
 use crate::core::common::{
-    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord,
-    HostResults, IpOptions, IpPort, IpProtocol, OutputOptions, PingOptions,
+    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions,
+    IpPort, IpProtocol, OutputOptions, PingOptions,
 };
-use crate::core::konst::{
-    BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE, MAX_PACKET_SIZE, PING_MSG,
-};
+use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE, MAX_PACKET_SIZE, PING_MSG};
 use crate::util::dns::resolve_host;
 use crate::util::handler::{io_error_switch_handler, loop_handler, output_handler2};
-use crate::util::message::{
-    client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg,
-};
+use crate::util::message::{client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg};
 use crate::util::parser::parse_ipaddr;
 use crate::util::result::{client_summary_result, get_results_map};
 use crate::util::time::{calc_connect_ms, time_now_us};
@@ -149,8 +145,7 @@ impl UdpClient {
                     let src_ip_port = src_ip_port.clone();
                     async move {
                         //
-                        process_host(src_ip_port, host_record, self.ping_options, self.ip_options)
-                            .await
+                        process_host(src_ip_port, host_record, self.ping_options, self.ip_options).await
                     }
                 })
                 .buffer_unordered(BUFFER_SIZE)
@@ -178,23 +173,14 @@ impl UdpClient {
         let mut client_results: Vec<ClientResult> = Vec::new();
         for (_, addrs) in results_map {
             for (addr, latencies) in addrs {
-                let client_summary = ClientSummary {
-                    send_count,
-                    latencies,
-                };
-                let client_summary =
-                    client_summary_result(&addr, ConnectMethod::UDP, client_summary);
+                let client_summary = ClientSummary { send_count, latencies };
+                let client_summary = client_summary_result(&addr, ConnectMethod::UDP, client_summary);
                 client_results.push(client_summary)
             }
         }
         client_results.sort_by_key(|x| x.destination.to_owned());
 
-        let summary_table = client_summary_table_msg(
-            &self.dst_ip,
-            self.dst_port,
-            ConnectMethod::UDP,
-            &client_results,
-        );
+        let summary_table = client_summary_table_msg(&self.dst_ip, self.dst_port, ConnectMethod::UDP, &client_results);
         println!("{}", summary_table);
 
         Ok(())
@@ -232,11 +218,7 @@ async fn process_host(
     }
 }
 
-async fn connect_host(
-    src: IpPort,
-    dst_socket: SocketAddr,
-    ping_options: PingOptions,
-) -> ConnectRecord {
+async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOptions) -> ConnectRecord {
     let bind_addr = match &dst_socket.is_ipv4() {
         // Bind the source socket to the same IP Version as the destination socket.
         true => SocketAddr::new(src.ipv4, src.port),
@@ -282,7 +264,7 @@ async fn connect_host(
     // TODO: need to investigate if this can error
     let _ = writer.connect(dst_socket).await;
 
-    match ping_options.nk_peer_messaging {
+    match ping_options.nk_peer {
         false => {
             // TODO: need to investigate if this can error
             // This should not error if connect was successful.
@@ -323,7 +305,7 @@ async fn connect_host(
                 conn_record.time = connection_time;
                 // latencies.push(connection_time);
 
-                if ping_options.nk_peer_messaging && len > 0 {
+                if ping_options.nk_peer && len > 0 {
                     // let data_string = &String::from_utf8_lossy(&buffer[..len]);
 
                     // // Handle connection to a NetKraken peer

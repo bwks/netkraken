@@ -1,11 +1,11 @@
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Parser;
 
-use crate::core::common::{
-    ConnectMethod, IpOptions, IpProtocol, ListenOptions, OutputOptions, PingOptions,
-};
+use crate::core::common::{ConnectMethod, IpOptions, IpProtocol, ListenOptions, OutputOptions, PingOptions};
+use crate::core::config::Config;
 use crate::core::konst::{
-    BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, INTERVAL, LOGFILE_DIR, LOGFILE_NAME, REPEAT, TIMEOUT,
+    BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CONFIG_FILE, LOGFILE_DIR, LOGFILE_NAME, PING_INTERVAL, PING_NK_PEER,
+    PING_REPEAT, PING_TIMEOUT,
 };
 use crate::tcp::client::TcpClient;
 use crate::tcp::server::TcpServer;
@@ -21,11 +21,20 @@ use crate::util::validate::validate_local_ip;
 #[command(about = "NetKraken - Cross platform network connectivity tester", long_about = None)]
 pub struct Cli {
     /// Destination hostname or IP address
-    pub host: String,
+    pub host: Option<String>,
 
     /// Destination port or
     /// Listen port in `-l --listen` mode
-    pub port: u16,
+    pub port: Option<u16>,
+
+    /// Config filename.
+    /// Search Path: $HOME/.config/nk.toml >> $CWD/nk.toml
+    #[clap(short, long, default_value = CONFIG_FILE)]
+    pub config: String,
+
+    /// Generate a default config file: $CWD/nk.toml.
+    #[clap(long, default_value_t = false)]
+    pub config_generate: bool,
 
     /// Logging directory
     #[clap(short, long, default_value = LOGFILE_DIR)]
@@ -36,7 +45,7 @@ pub struct Cli {
     pub file: String,
 
     /// Interval between pings (in milliseconds)
-    #[clap(short, long, default_value_t = INTERVAL)]
+    #[clap(short, long, default_value_t = PING_INTERVAL)]
     pub interval: u16,
 
     /// Connection Method
@@ -44,7 +53,7 @@ pub struct Cli {
     pub method: ConnectMethod,
 
     /// Repeat count (0 == max == 65535)
-    #[clap(short, long, default_value_t = REPEAT)]
+    #[clap(short, long, default_value_t = PING_REPEAT)]
     pub repeat: u16,
 
     /// IP Protocol to use
@@ -64,7 +73,7 @@ pub struct Cli {
     pub src_port: u16,
 
     /// Connection timeout (in milliseconds)
-    #[clap(short, long, default_value_t = TIMEOUT)]
+    #[clap(short, long, default_value_t = PING_TIMEOUT)]
     pub timeout: u16,
 
     // Server specific options
@@ -102,15 +111,44 @@ impl Cli {
         println!("{header_msg}");
         let cli = Cli::parse();
 
+        if cli.config_generate {
+            Config::generate()?;
+            return Ok(());
+        }
+
+        let host = cli.host.unwrap_or_default();
+        let port = cli.port.unwrap_or_default();
+        if host.is_empty() || port == 0 {
+            bail!("Destination host and port are required.");
+        }
+
+        let config = match Config::load(&cli.config) {
+            Ok(c) => {
+                println!("Configuration file `{}` loaded.\n", cli.config);
+                c
+            }
+            Err(_) => {
+                println!(
+                    "Configuration file `{}` not found. Using default configuration.\n",
+                    cli.config
+                );
+                Config::default()
+            }
+        };
+
         let ip_options = IpOptions {
             ip_protocol: cli.ip_proto,
         };
 
+        // CLI options should override config file options.
+        // If a CLI option is NOT the same as the default,
+        // the option was set from the CLI. Therefore we should
+        // use the CLI option. Otherwise use the config file option.
         let ping_options = PingOptions {
-            repeat: cli.repeat,
-            interval: cli.interval,
-            timeout: cli.timeout,
-            nk_peer_messaging: cli.nk_peer,
+            repeat: if cli.repeat != PING_REPEAT { cli.repeat } else { config.ping_options.repeat },
+            interval: if cli.interval != PING_INTERVAL { cli.interval } else { config.ping_options.interval },
+            timeout: if cli.timeout != PING_TIMEOUT { cli.timeout } else { config.ping_options.timeout },
+            nk_peer: if cli.nk_peer == PING_NK_PEER { config.ping_options.nk_peer } else { cli.nk_peer },
         };
 
         let listen_options = ListenOptions {
@@ -140,16 +178,16 @@ impl Cli {
             ConnectMethod::TCP => {
                 if cli.listen {
                     let tcp_server = TcpServer {
-                        listen_ip: cli.host,
-                        listen_port: cli.port,
+                        listen_ip: host,
+                        listen_port: port,
                         output_options,
                         listen_options,
                     };
                     tcp_server.listen().await?;
                 } else {
                     let tcp_client = TcpClient::new(
-                        cli.host,
-                        cli.port,
+                        host,
+                        port,
                         Some(cli.src_v4),
                         Some(cli.src_v6),
                         Some(cli.src_port),
@@ -163,16 +201,16 @@ impl Cli {
             ConnectMethod::UDP => {
                 if cli.listen {
                     let udp_server = UdpServer {
-                        listen_ip: cli.host,
-                        listen_port: cli.port,
+                        listen_ip: host,
+                        listen_port: port,
                         output_options,
                         listen_options,
                     };
                     udp_server.listen().await?;
                 } else {
                     let udp_client = UdpClient::new(
-                        cli.host,
-                        cli.port,
+                        host,
+                        port,
                         Some(cli.src_v4),
                         Some(cli.src_v6),
                         Some(cli.src_port),
