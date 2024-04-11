@@ -6,7 +6,7 @@ use clap::ValueEnum;
 use serde_derive::{Deserialize, Serialize};
 use tabled::Tabled;
 
-use crate::core::konst::{PING_INTERVAL, PING_NK_PEER, PING_REPEAT, PING_TIMEOUT};
+use crate::core::konst::{CURRENT_DIR, LOGFILE_NAME, PING_INTERVAL, PING_NK_PEER, PING_REPEAT, PING_TIMEOUT};
 use crate::util::time::{time_now_us, time_now_utc};
 
 #[allow(dead_code)]
@@ -45,8 +45,8 @@ pub enum ConnectMethod {
     #[default]
     TCP,
     UDP,
-    ICMP,
-    HTTP,
+    // ICMP,
+    // HTTP,
 }
 
 impl Display for ConnectMethod {
@@ -54,8 +54,8 @@ impl Display for ConnectMethod {
         match self {
             ConnectMethod::TCP => write!(f, "tcp"),
             ConnectMethod::UDP => write!(f, "udp"),
-            ConnectMethod::ICMP => write!(f, "icmp"),
-            ConnectMethod::HTTP => write!(f, "http"),
+            // ConnectMethod::ICMP => write!(f, "icmp"),
+            // ConnectMethod::HTTP => write!(f, "http"),
         }
     }
 }
@@ -94,12 +94,26 @@ pub struct IpOptions {
     pub ip_protocol: IpProtocol,
 }
 
-#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default)]
 pub struct LoggingOptions {
+    pub file: String,
+    pub dir: String,
     pub quiet: bool,
     pub json: bool,
     pub syslog: bool,
+}
+
+impl Default for LoggingOptions {
+    fn default() -> Self {
+        Self {
+            file: LOGFILE_NAME.to_owned(),
+            dir: CURRENT_DIR.to_owned(),
+            quiet: false,
+            json: false,
+            syslog: false,
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]

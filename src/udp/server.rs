@@ -6,7 +6,7 @@ use tokio::sync::mpsc;
 
 use crate::core::common::{ConnectMethod, ConnectResult, ListenOptions, LogLevel, LoggingOptions};
 use crate::core::konst::{BIND_ADDR_IPV4, BIND_PORT, MAX_PACKET_SIZE};
-use crate::util::handler::output_handler;
+use crate::util::handler::log_handler;
 use crate::util::message::{server_conn_success_msg, server_start_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
@@ -14,7 +14,7 @@ use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 pub struct UdpServer {
     pub listen_ip: String,
     pub listen_port: u16,
-    pub output_options: LoggingOptions,
+    pub logging_options: LoggingOptions,
     pub listen_options: ListenOptions,
 }
 
@@ -93,7 +93,7 @@ impl UdpServer {
                 local_addr,
                 client_server_time,
             );
-            output_handler(LogLevel::INFO, &msg, &self.output_options).await;
+            log_handler(LogLevel::INFO, &msg, &self.logging_options).await;
         }
     }
 }
@@ -103,7 +103,7 @@ impl Default for UdpServer {
         Self {
             listen_ip: BIND_ADDR_IPV4.to_owned(),
             listen_port: BIND_PORT,
-            output_options: LoggingOptions::default(),
+            logging_options: LoggingOptions::default(),
             listen_options: ListenOptions::default(),
         }
     }

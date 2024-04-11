@@ -31,11 +31,11 @@ pub async fn loop_handler(loop_count: u16, num_repeats: u16, sleep_interval: u16
     }
 }
 
-pub async fn output_handler(log_level: LogLevel, message: &String, output_options: &LoggingOptions) {
-    if !output_options.quiet {
+pub async fn log_handler(log_level: LogLevel, message: &String, logging_options: &LoggingOptions) {
+    if !logging_options.quiet {
         println!("{message}");
     }
-    if output_options.syslog {
+    if logging_options.syslog {
         match log_level {
             LogLevel::DEBUG => event!(target: APP_NAME, Level::DEBUG, "{message}"),
             LogLevel::ERROR => event!(target: APP_NAME, Level::ERROR, "{message}"),
@@ -44,7 +44,7 @@ pub async fn output_handler(log_level: LogLevel, message: &String, output_option
             LogLevel::TRACE => event!(target: APP_NAME, Level::TRACE, "{message}"),
         };
     }
-    if output_options.json {
+    if logging_options.json {
         // json handler
     }
 }
@@ -58,17 +58,17 @@ pub fn io_error_switch_handler(error: std::io::Error) -> ConnectResult {
     }
 }
 
-pub async fn output_handler2(record: &ConnectRecord, message: &String, output_options: &LoggingOptions) {
-    if !output_options.quiet {
+pub async fn log_handler2(record: &ConnectRecord, message: &String, logging_options: &LoggingOptions) {
+    if !logging_options.quiet {
         println!("{message}");
     }
-    if output_options.syslog {
+    if logging_options.syslog {
         match record.success {
             true => event!(target: APP_NAME, Level::INFO, "{message}"),
             false => event!(target: APP_NAME, Level::ERROR, "{message}"),
         };
     }
-    if output_options.json {
+    if logging_options.json {
         // json handler
     }
 }

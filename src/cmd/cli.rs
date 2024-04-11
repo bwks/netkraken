@@ -4,14 +4,13 @@ use clap::Parser;
 use crate::core::common::{ConnectMethod, IpOptions, IpProtocol, ListenOptions, LoggingOptions, PingOptions};
 use crate::core::config::Config;
 use crate::core::konst::{
-    BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CONFIG_FILE, LOGFILE_DIR, LOGFILE_NAME, PING_INTERVAL, PING_NK_PEER,
-    PING_REPEAT, PING_TIMEOUT,
+    BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CLI_HEADER_MSG, CONFIG_FILE, CURRENT_DIR, LOGFILE_NAME, PING_INTERVAL,
+    PING_NK_PEER, PING_REPEAT, PING_TIMEOUT,
 };
 use crate::tcp::client::TcpClient;
 use crate::tcp::server::TcpServer;
 use crate::udp::client::UdpClient;
 use crate::udp::server::UdpServer;
-use crate::util::message::cli_header_msg;
 use crate::util::validate::validate_local_ip;
 
 #[derive(Debug, Parser)]
@@ -27,34 +26,21 @@ pub struct Cli {
     /// Listen port in `-l --listen` mode
     pub port: Option<u16>,
 
-    /// Config filename.
-    /// Search Path: $HOME/.config/nk.toml >> $CWD/nk.toml
-    #[clap(short, long, default_value = CONFIG_FILE)]
-    pub config: String,
-
-    /// Generate a default config file: $CWD/nk.toml.
-    #[clap(long, default_value_t = false)]
-    pub config_generate: bool,
-
-    /// Logging directory
-    #[clap(short, long, default_value = LOGFILE_DIR)]
-    pub dir: String,
-
-    /// Logging filename
-    #[clap(short, long, default_value = LOGFILE_NAME)]
-    pub file: String,
+    /// Repeat count (0 == max == 65535)
+    #[clap(short, long, default_value_t = PING_REPEAT)]
+    pub repeat: u16,
 
     /// Interval between pings (in milliseconds)
     #[clap(short, long, default_value_t = PING_INTERVAL)]
     pub interval: u16,
 
+    /// Connection timeout (in milliseconds)
+    #[clap(short, long, default_value_t = PING_TIMEOUT)]
+    pub timeout: u16,
+
     /// Connection Method
     #[clap(short, long, default_value_t = ConnectMethod::TCP)]
     pub method: ConnectMethod,
-
-    /// Repeat count (0 == max == 65535)
-    #[clap(short, long, default_value_t = PING_REPEAT)]
-    pub repeat: u16,
 
     /// IP Protocol to use
     #[clap(short = 'I', long, default_value_t = IpProtocol::V4)]
@@ -72,9 +58,18 @@ pub struct Cli {
     #[clap(short = 'P', long, default_value_t = BIND_PORT)]
     pub src_port: u16,
 
-    /// Connection timeout (in milliseconds)
-    #[clap(short, long, default_value_t = PING_TIMEOUT)]
-    pub timeout: u16,
+    /// NetKraken peer messaging
+    #[clap(short, long, default_value_t = false)]
+    pub nk_peer: bool,
+
+    /// Config filename.
+    /// Search Path: $HOME/.config/nk.toml >> $CWD/nk.toml
+    #[clap(short, long, default_value = CONFIG_FILE)]
+    pub config: String,
+
+    /// Generate a default config file: $CWD/nk.toml.
+    #[clap(long, default_value_t = false)]
+    pub config_generate: bool,
 
     // Server specific options
     // -----------------------
@@ -82,23 +77,27 @@ pub struct Cli {
     #[clap(short, long, default_value_t = false)]
     pub listen: bool,
 
-    // Output options
+    // Logging options
     // --------------
+    /// Logging directory
+    #[clap(short, long="dir", default_value = CURRENT_DIR)]
+    pub dir: String,
+
+    /// Logging filename
+    #[clap(short, long="file", default_value = LOGFILE_NAME)]
+    pub file: String,
+
     /// Log to file in JSON format
     #[clap(short, long, default_value_t = false)]
     pub json: bool,
 
-    /// NetKraken peer messaging
+    /// Log to file in SYSLOG format
     #[clap(short, long, default_value_t = false)]
-    pub nk_peer: bool,
+    pub syslog: bool,
 
     /// Silence terminal output
     #[clap(short, long, default_value_t = false)]
     pub quiet: bool,
-
-    /// Log to file in SYSLOG format
-    #[clap(short, long, default_value_t = false)]
-    pub syslog: bool,
 }
 
 impl Cli {
@@ -107,8 +106,7 @@ impl Cli {
     }
 
     pub async fn run(&self) -> Result<()> {
-        let header_msg = cli_header_msg();
-        println!("{header_msg}");
+        println!("{CLI_HEADER_MSG}");
         let cli = Cli::parse();
 
         if cli.config_generate {
@@ -150,11 +148,16 @@ impl Cli {
             repeat: if cli.repeat != PING_REPEAT { cli.repeat } else { config.ping_options.repeat },
             interval: if cli.interval != PING_INTERVAL { cli.interval } else { config.ping_options.interval },
             timeout: if cli.timeout != PING_TIMEOUT { cli.timeout } else { config.ping_options.timeout },
-            nk_peer: if cli.nk_peer == PING_NK_PEER { config.ping_options.nk_peer } else { cli.nk_peer },
+            nk_peer: if cli.nk_peer != PING_NK_PEER { cli.nk_peer } else { config.ping_options.nk_peer },
         };
 
-        let listen_options = ListenOptions { nk_peer: cli.nk_peer };
-        let output_options = LoggingOptions {
+        let listen_options = ListenOptions {
+            nk_peer: if cli.nk_peer != PING_NK_PEER { cli.nk_peer } else { config.listen_options.nk_peer },
+        };
+
+        let logging_options = LoggingOptions {
+            file: cli.file,
+            dir: cli.dir,
             json: cli.json,
             quiet: cli.quiet,
             syslog: cli.syslog,
@@ -173,14 +176,14 @@ impl Cli {
         // endregion: ===== validators ===== //
 
         match cli.method {
-            ConnectMethod::HTTP => println!("http not implemented"),
-            ConnectMethod::ICMP => println!("icmp not implemented"),
+            // ConnectMethod::HTTP => println!("http not implemented"),
+            // ConnectMethod::ICMP => println!("icmp not implemented"),
             ConnectMethod::TCP => {
                 if cli.listen {
                     let tcp_server = TcpServer {
                         listen_ip: host,
                         listen_port: port,
-                        output_options,
+                        logging_options,
                         listen_options,
                     };
                     tcp_server.listen().await?;
@@ -191,7 +194,7 @@ impl Cli {
                         Some(cli.src_v4),
                         Some(cli.src_v6),
                         Some(cli.src_port),
-                        output_options,
+                        logging_options,
                         ping_options,
                         ip_options,
                     );
@@ -203,7 +206,7 @@ impl Cli {
                     let udp_server = UdpServer {
                         listen_ip: host,
                         listen_port: port,
-                        output_options,
+                        logging_options,
                         listen_options,
                     };
                     udp_server.listen().await?;
@@ -214,7 +217,7 @@ impl Cli {
                         Some(cli.src_v4),
                         Some(cli.src_v6),
                         Some(cli.src_port),
-                        output_options,
+                        logging_options,
                         ping_options,
                         ip_options,
                     );

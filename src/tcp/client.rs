@@ -14,7 +14,7 @@ use crate::core::common::{
 };
 use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE};
 use crate::util::dns::resolve_host;
-use crate::util::handler::{io_error_switch_handler, loop_handler, output_handler2};
+use crate::util::handler::{io_error_switch_handler, log_handler2, loop_handler};
 use crate::util::message::{client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg};
 use crate::util::parser::parse_ipaddr;
 use crate::util::result::{client_summary_result, get_results_map};
@@ -27,7 +27,7 @@ pub struct TcpClient {
     pub src_ipv4: Option<IpAddr>,
     pub src_ipv6: Option<IpAddr>,
     pub src_port: u16,
-    pub output_options: LoggingOptions,
+    pub logging_options: LoggingOptions,
     pub ping_options: PingOptions,
     pub ip_options: IpOptions,
 }
@@ -40,7 +40,7 @@ impl TcpClient {
         src_ipv4: Option<String>,
         src_ipv6: Option<String>,
         src_port: Option<u16>,
-        output_options: LoggingOptions,
+        logging_options: LoggingOptions,
         ping_options: PingOptions,
         ip_options: IpOptions,
     ) -> TcpClient {
@@ -62,7 +62,7 @@ impl TcpClient {
             src_ipv4,
             src_ipv6,
             src_port,
-            output_options,
+            logging_options,
             ping_options,
             ip_options,
         }
@@ -164,7 +164,7 @@ impl TcpClient {
                         .push(result.time);
 
                     let success_msg = client_result_msg(&result);
-                    output_handler2(&result, &success_msg, &self.output_options).await;
+                    log_handler2(&result, &success_msg, &self.logging_options).await;
                 }
             }
 
