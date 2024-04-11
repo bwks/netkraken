@@ -60,10 +60,11 @@ impl Display for ConnectMethod {
     }
 }
 
-#[derive(ValueEnum, Copy, Clone, Debug, Default, Serialize)]
+#[derive(ValueEnum, Copy, Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum IpProtocol {
-    #[default]
     All,
+    #[default]
     V4,
     V6,
 }
@@ -87,19 +88,22 @@ pub enum LogLevel {
     TRACE,
 }
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default)]
 pub struct IpOptions {
     pub ip_protocol: IpProtocol,
 }
 
-#[derive(Copy, Clone, Debug, Default)]
-pub struct OutputOptions {
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LoggingOptions {
     pub quiet: bool,
     pub json: bool,
     pub syslog: bool,
 }
 
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct PingOptions {
     pub repeat: u16,
     pub interval: u16,
@@ -118,9 +122,9 @@ impl Default for PingOptions {
     }
 }
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ListenOptions {
-    pub nk_peer_messaging: bool,
+    pub nk_peer: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]

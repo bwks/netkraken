@@ -9,15 +9,13 @@ use tokio::signal;
 use tokio::time::{timeout, Duration};
 
 use crate::core::common::{
-    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord,
-    HostResults, IpOptions, IpPort, IpProtocol, OutputOptions, PingOptions,
+    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions,
+    IpPort, IpProtocol, LoggingOptions, PingOptions,
 };
 use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE};
 use crate::util::dns::resolve_host;
 use crate::util::handler::{io_error_switch_handler, loop_handler, output_handler2};
-use crate::util::message::{
-    client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg,
-};
+use crate::util::message::{client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg};
 use crate::util::parser::parse_ipaddr;
 use crate::util::result::{client_summary_result, get_results_map};
 use crate::util::time::{calc_connect_ms, time_now_us};
@@ -29,7 +27,7 @@ pub struct TcpClient {
     pub src_ipv4: Option<IpAddr>,
     pub src_ipv6: Option<IpAddr>,
     pub src_port: u16,
-    pub output_options: OutputOptions,
+    pub output_options: LoggingOptions,
     pub ping_options: PingOptions,
     pub ip_options: IpOptions,
 }
@@ -42,7 +40,7 @@ impl TcpClient {
         src_ipv4: Option<String>,
         src_ipv6: Option<String>,
         src_port: Option<u16>,
-        output_options: OutputOptions,
+        output_options: LoggingOptions,
         ping_options: PingOptions,
         ip_options: IpOptions,
     ) -> TcpClient {
@@ -147,8 +145,7 @@ impl TcpClient {
                     let src_ip_port = src_ip_port.clone();
                     async move {
                         //
-                        process_host(src_ip_port, host_record, self.ping_options, self.ip_options)
-                            .await
+                        process_host(src_ip_port, host_record, self.ping_options, self.ip_options).await
                     }
                 })
                 .buffer_unordered(BUFFER_SIZE)
@@ -177,22 +174,14 @@ impl TcpClient {
         let mut client_results: Vec<ClientResult> = Vec::new();
         for (_, addrs) in results_map {
             for (addr, latencies) in addrs {
-                let client_summary = ClientSummary {
-                    send_count,
-                    latencies,
-                };
+                let client_summary = ClientSummary { send_count, latencies };
                 let summary_msg = client_summary_result(&addr, ConnectMethod::TCP, client_summary);
                 client_results.push(summary_msg)
             }
         }
         client_results.sort_by_key(|x| x.destination.to_owned());
 
-        let summary_table = client_summary_table_msg(
-            &self.dst_ip,
-            self.dst_port,
-            ConnectMethod::TCP,
-            &client_results,
-        );
+        let summary_table = client_summary_table_msg(&self.dst_ip, self.dst_port, ConnectMethod::TCP, &client_results);
         println!("{}", summary_table);
 
         Ok(())
@@ -230,11 +219,7 @@ async fn process_host(
     }
 }
 
-async fn connect_host(
-    src: IpPort,
-    dst_socket: SocketAddr,
-    ping_options: PingOptions,
-) -> ConnectRecord {
+async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOptions) -> ConnectRecord {
     let (bind_addr, src_socket) = match &dst_socket.is_ipv4() {
         // Bind the source socket to the same IP Version as the destination socket.
         true => {

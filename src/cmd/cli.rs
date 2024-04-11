@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use clap::Parser;
 
-use crate::core::common::{ConnectMethod, IpOptions, IpProtocol, ListenOptions, OutputOptions, PingOptions};
+use crate::core::common::{ConnectMethod, IpOptions, IpProtocol, ListenOptions, LoggingOptions, PingOptions};
 use crate::core::config::Config;
 use crate::core::konst::{
     BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CONFIG_FILE, LOGFILE_DIR, LOGFILE_NAME, PING_INTERVAL, PING_NK_PEER,
@@ -124,7 +124,7 @@ impl Cli {
 
         let config = match Config::load(&cli.config) {
             Ok(c) => {
-                println!("Configuration file `{}` loaded.\n", cli.config);
+                println!("Using configuration file `{}`.\n", cli.config);
                 c
             }
             Err(_) => {
@@ -136,8 +136,10 @@ impl Cli {
             }
         };
 
+        println!("{:#?}", config);
+
         let ip_options = IpOptions {
-            ip_protocol: cli.ip_proto,
+            ip_protocol: if cli.ip_proto != IpProtocol::V4 { cli.ip_proto } else { config.ip_options.ip_protocol },
         };
 
         // CLI options should override config file options.
@@ -151,10 +153,8 @@ impl Cli {
             nk_peer: if cli.nk_peer == PING_NK_PEER { config.ping_options.nk_peer } else { cli.nk_peer },
         };
 
-        let listen_options = ListenOptions {
-            nk_peer_messaging: cli.nk_peer,
-        };
-        let output_options = OutputOptions {
+        let listen_options = ListenOptions { nk_peer: cli.nk_peer };
+        let output_options = LoggingOptions {
             json: cli.json,
             quiet: cli.quiet,
             syslog: cli.syslog,

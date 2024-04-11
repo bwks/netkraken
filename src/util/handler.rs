@@ -3,7 +3,7 @@ use tracing::event;
 use tracing::Level;
 
 use crate::core::common::LogLevel;
-use crate::core::common::OutputOptions;
+use crate::core::common::LoggingOptions;
 use crate::core::common::{ConnectRecord, ConnectResult};
 use crate::core::konst::APP_NAME;
 
@@ -31,7 +31,7 @@ pub async fn loop_handler(loop_count: u16, num_repeats: u16, sleep_interval: u16
     }
 }
 
-pub async fn output_handler(log_level: LogLevel, message: &String, output_options: &OutputOptions) {
+pub async fn output_handler(log_level: LogLevel, message: &String, output_options: &LoggingOptions) {
     if !output_options.quiet {
         println!("{message}");
     }
@@ -58,11 +58,7 @@ pub fn io_error_switch_handler(error: std::io::Error) -> ConnectResult {
     }
 }
 
-pub async fn output_handler2(
-    record: &ConnectRecord,
-    message: &String,
-    output_options: &OutputOptions,
-) {
+pub async fn output_handler2(record: &ConnectRecord, message: &String, output_options: &LoggingOptions) {
     if !output_options.quiet {
         println!("{message}");
     }

@@ -10,7 +10,7 @@ use tokio::time::{timeout, Duration};
 
 use crate::core::common::{
     ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions,
-    IpPort, IpProtocol, OutputOptions, PingOptions,
+    IpPort, IpProtocol, LoggingOptions, PingOptions,
 };
 use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE, MAX_PACKET_SIZE, PING_MSG};
 use crate::util::dns::resolve_host;
@@ -26,7 +26,7 @@ pub struct UdpClient {
     pub src_ipv4: Option<IpAddr>,
     pub src_ipv6: Option<IpAddr>,
     pub src_port: u16,
-    pub output_options: OutputOptions,
+    pub output_options: LoggingOptions,
     pub ping_options: PingOptions,
     pub ip_options: IpOptions,
 }
@@ -39,7 +39,7 @@ impl UdpClient {
         src_ipv4: Option<String>,
         src_ipv6: Option<String>,
         src_port: Option<u16>,
-        output_options: OutputOptions,
+        output_options: LoggingOptions,
         ping_options: PingOptions,
         ip_options: IpOptions,
     ) -> UdpClient {

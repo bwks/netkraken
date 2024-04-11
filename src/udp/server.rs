@@ -4,7 +4,7 @@ use anyhow::Result;
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 
-use crate::core::common::{ConnectMethod, ConnectResult, ListenOptions, LogLevel, OutputOptions};
+use crate::core::common::{ConnectMethod, ConnectResult, ListenOptions, LogLevel, LoggingOptions};
 use crate::core::konst::{BIND_ADDR_IPV4, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::output_handler;
 use crate::util::message::{server_conn_success_msg, server_start_msg};
@@ -14,7 +14,7 @@ use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 pub struct UdpServer {
     pub listen_ip: String,
     pub listen_port: u16,
-    pub output_options: OutputOptions,
+    pub output_options: LoggingOptions,
     pub listen_options: ListenOptions,
 }
 
@@ -61,7 +61,7 @@ impl UdpServer {
             // Add echo handler
             let mut client_server_time = 0.0;
 
-            match self.listen_options.nk_peer_messaging && len > 0 {
+            match self.listen_options.nk_peer && len > 0 {
                 false => {
                     tx_chan.send((buffer.clone(), addr)).await?;
                 }
@@ -70,8 +70,7 @@ impl UdpServer {
 
                     match nk_msg_reader(data_string) {
                         Some(mut m) => {
-                            let connection_time =
-                                calc_connect_ms(m.send_timestamp, receive_time_stamp);
+                            let connection_time = calc_connect_ms(m.send_timestamp, receive_time_stamp);
                             client_server_time = connection_time;
 
                             m.receive_time_utc = receive_time_utc;
@@ -80,9 +79,7 @@ impl UdpServer {
                             m.nk_peer = true;
 
                             let json_message = serde_json::to_string(&m)?;
-                            tx_chan
-                                .send((json_message.as_bytes().to_vec(), addr))
-                                .await?;
+                            tx_chan.send((json_message.as_bytes().to_vec(), addr)).await?;
                         }
                         None => tx_chan.send((buffer.clone(), addr)).await?,
                     }
@@ -106,7 +103,7 @@ impl Default for UdpServer {
         Self {
             listen_ip: BIND_ADDR_IPV4.to_owned(),
             listen_port: BIND_PORT,
-            output_options: OutputOptions::default(),
+            output_options: LoggingOptions::default(),
             listen_options: ListenOptions::default(),
         }
     }
