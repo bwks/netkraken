@@ -14,9 +14,6 @@ anyhow = "1.0.72"
 # CLI
 clap = { version = "4.3.19", features = ["derive"] }
 
-# Home directory detection
-dirs = "5.0.1"
-
 # List IP addresses of all network interfaces
 local-ip-address = "0.6.1"
 

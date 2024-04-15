@@ -6,7 +6,10 @@ use clap::ValueEnum;
 use serde_derive::{Deserialize, Serialize};
 use tabled::Tabled;
 
-use crate::core::konst::{CURRENT_DIR, LOGFILE_NAME, PING_INTERVAL, PING_NK_PEER, PING_REPEAT, PING_TIMEOUT};
+use crate::core::konst::{
+    CURRENT_DIR, LOGFILE_NAME, LOGGING_JSON, LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER, PING_REPEAT,
+    PING_TIMEOUT,
+};
 use crate::util::time::{time_now_us, time_now_utc};
 
 #[allow(dead_code)]
@@ -109,9 +112,9 @@ impl Default for LoggingOptions {
         Self {
             file: LOGFILE_NAME.to_owned(),
             dir: CURRENT_DIR.to_owned(),
-            quiet: false,
-            json: false,
-            syslog: false,
+            quiet: LOGGING_QUIET,
+            json: LOGGING_JSON,
+            syslog: LOGGING_SYSLOG,
         }
     }
 }

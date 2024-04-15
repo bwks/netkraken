@@ -6,14 +6,13 @@ use anyhow::Result;
 
 use serde_derive::{Deserialize, Serialize};
 
-use dirs::home_dir;
-
 use toml::from_str;
 
 use crate::core::common::{IpOptions, ListenOptions, LoggingOptions, PingOptions};
 use crate::core::konst::CONFIG_FILE;
 
-#[derive(Deserialize, Debug, Serialize)]
+/// Configuration options for NetKraken
+#[derive(Deserialize, Debug, Default, Serialize)]
 pub struct Config {
     pub ping_options: PingOptions,
     pub ip_options: IpOptions,
@@ -21,30 +20,26 @@ pub struct Config {
     pub listen_options: ListenOptions,
 }
 
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            ping_options: PingOptions::default(),
-            ip_options: IpOptions::default(),
-            logging_options: LoggingOptions::default(),
-            listen_options: ListenOptions::default(),
-        }
-    }
-}
-
 impl Config {
+    /// Load a config file from the current directory.
     pub fn load(filename: &str) -> Result<Config> {
-        let mut config_file = match home_dir() {
-            Some(c) => c,
-            None => PathBuf::from("."),
-        };
-        config_file.push(filename);
+        let mut config_file_path = PathBuf::from(".");
+        config_file_path.push(filename);
 
-        let config = read_to_string(filename)?;
+        let config = read_to_string(config_file_path)?;
         let config: Config = from_str(&config)?;
+
         Ok(config)
     }
+
+    /// Generate a default config file
     pub fn generate() -> Result<()> {
+        // If config file exists don't overwrite it.
+        if PathBuf::from(CONFIG_FILE).exists() {
+            println!("Config file `{CONFIG_FILE}` already exists in current directory.\n");
+            return Ok(());
+        }
+
         let config = Config::default();
         let toml_config = toml::to_string(&config)?;
 

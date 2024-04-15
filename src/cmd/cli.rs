@@ -4,8 +4,8 @@ use clap::Parser;
 use crate::core::common::{ConnectMethod, IpOptions, IpProtocol, ListenOptions, LoggingOptions, PingOptions};
 use crate::core::config::Config;
 use crate::core::konst::{
-    BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CLI_HEADER_MSG, CONFIG_FILE, CURRENT_DIR, LOGFILE_NAME, PING_INTERVAL,
-    PING_NK_PEER, PING_REPEAT, PING_TIMEOUT,
+    BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CLI_HEADER_MSG, CONFIG_FILE, CURRENT_DIR, LOGFILE_NAME, LOGGING_JSON,
+    LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER, PING_REPEAT, PING_TIMEOUT,
 };
 use crate::tcp::client::TcpClient;
 use crate::tcp::server::TcpServer;
@@ -63,7 +63,7 @@ pub struct Cli {
     pub nk_peer: bool,
 
     /// Config filename.
-    /// Search Path: $HOME/.config/nk.toml >> $CWD/nk.toml
+    /// Search Path: $CWD/nk.toml
     #[clap(short, long, default_value = CONFIG_FILE)]
     pub config: String,
 
@@ -109,11 +109,17 @@ impl Cli {
         println!("{CLI_HEADER_MSG}");
         let cli = Cli::parse();
 
+        // region:    ===== pre-required args ===== //
+
         if cli.config_generate {
             Config::generate()?;
             return Ok(());
         }
 
+        // endregion: ===== pre-required args ===== //
+
+        // Host and port are required. If we don't receive them
+        // from the CLI, we should error out.
         let host = cli.host.unwrap_or_default();
         let port = cli.port.unwrap_or_default();
         if host.is_empty() || port == 0 {
@@ -121,9 +127,9 @@ impl Cli {
         }
 
         let config = match Config::load(&cli.config) {
-            Ok(c) => {
+            Ok(config) => {
                 println!("Using configuration file `{}`.\n", cli.config);
-                c
+                config
             }
             Err(_) => {
                 println!(
@@ -154,11 +160,11 @@ impl Cli {
         };
 
         let logging_options = LoggingOptions {
-            file: cli.file,
-            dir: cli.dir,
-            json: cli.json,
-            quiet: cli.quiet,
-            syslog: cli.syslog,
+            file: if cli.file != LOGFILE_NAME { cli.file } else { config.logging_options.file },
+            dir: if cli.dir != CURRENT_DIR { cli.dir } else { config.logging_options.dir },
+            json: if cli.json != LOGGING_JSON { cli.json } else { config.logging_options.json },
+            quiet: if cli.quiet != LOGGING_QUIET { cli.quiet } else { config.logging_options.quiet },
+            syslog: if cli.syslog != LOGGING_SYSLOG { cli.syslog } else { config.logging_options.syslog },
         };
 
         // region:    ===== validators ===== //
