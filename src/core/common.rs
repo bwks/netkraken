@@ -6,6 +6,10 @@ use clap::ValueEnum;
 use serde_derive::{Deserialize, Serialize};
 use tabled::Tabled;
 
+use crate::core::konst::{
+    CURRENT_DIR, LOGFILE_NAME, LOGGING_JSON, LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER, PING_REPEAT,
+    PING_TIMEOUT,
+};
 use crate::util::time::{time_now_us, time_now_utc};
 
 #[allow(dead_code)]
@@ -44,8 +48,8 @@ pub enum ConnectMethod {
     #[default]
     TCP,
     UDP,
-    ICMP,
-    HTTP,
+    // ICMP,
+    // HTTP,
 }
 
 impl Display for ConnectMethod {
@@ -53,16 +57,17 @@ impl Display for ConnectMethod {
         match self {
             ConnectMethod::TCP => write!(f, "tcp"),
             ConnectMethod::UDP => write!(f, "udp"),
-            ConnectMethod::ICMP => write!(f, "icmp"),
-            ConnectMethod::HTTP => write!(f, "http"),
+            // ConnectMethod::ICMP => write!(f, "icmp"),
+            // ConnectMethod::HTTP => write!(f, "http"),
         }
     }
 }
 
-#[derive(ValueEnum, Copy, Clone, Debug, Default, Serialize)]
+#[derive(ValueEnum, Copy, Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
 pub enum IpProtocol {
-    #[default]
     All,
+    #[default]
     V4,
     V6,
 }
@@ -86,40 +91,57 @@ pub enum LogLevel {
     TRACE,
 }
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Deserialize, Serialize)]
+#[serde(default)]
 pub struct IpOptions {
     pub ip_protocol: IpProtocol,
 }
 
-#[derive(Copy, Clone, Debug, Default)]
-pub struct OutputOptions {
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LoggingOptions {
+    pub file: String,
+    pub dir: String,
     pub quiet: bool,
     pub json: bool,
     pub syslog: bool,
 }
 
-#[derive(Copy, Clone, Debug)]
+impl Default for LoggingOptions {
+    fn default() -> Self {
+        Self {
+            file: LOGFILE_NAME.to_owned(),
+            dir: CURRENT_DIR.to_owned(),
+            quiet: LOGGING_QUIET,
+            json: LOGGING_JSON,
+            syslog: LOGGING_SYSLOG,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct PingOptions {
     pub repeat: u16,
     pub interval: u16,
     pub timeout: u16,
-    pub nk_peer_messaging: bool,
+    pub nk_peer: bool,
 }
 
 impl Default for PingOptions {
     fn default() -> Self {
         Self {
-            repeat: 4,
-            interval: 1000,
-            timeout: 1000,
-            nk_peer_messaging: false,
+            repeat: PING_REPEAT,
+            interval: PING_INTERVAL,
+            timeout: PING_TIMEOUT,
+            nk_peer: PING_NK_PEER,
         }
     }
 }
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct ListenOptions {
-    pub nk_peer_messaging: bool,
+    pub nk_peer: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]

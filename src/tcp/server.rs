@@ -4,9 +4,9 @@ use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 
-use crate::core::common::{ConnectMethod, ConnectResult, ListenOptions, LogLevel, OutputOptions};
+use crate::core::common::{ConnectMethod, ConnectResult, ListenOptions, LogLevel, LoggingOptions};
 use crate::core::konst::{BIND_ADDR_IPV4, BIND_PORT, MAX_PACKET_SIZE};
-use crate::util::handler::output_handler;
+use crate::util::handler::log_handler;
 use crate::util::message::{server_conn_success_msg, server_start_msg};
 use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
@@ -14,7 +14,7 @@ use crate::util::time::{calc_connect_ms, time_now_us, time_now_utc};
 pub struct TcpServer {
     pub listen_ip: String,
     pub listen_port: u16,
-    pub output_options: OutputOptions,
+    pub logging_options: LoggingOptions,
     pub listen_options: ListenOptions,
 }
 
@@ -30,7 +30,7 @@ impl TcpServer {
         println!("{}", start_msg);
 
         loop {
-            let output_options = self.output_options;
+            let logging_options = self.logging_options.clone();
             let listen_options = self.listen_options;
             // Receive stream
             let (mut stream, _) = listener.accept().await?;
@@ -46,7 +46,7 @@ impl TcpServer {
                 buffer.truncate(len);
                 let mut client_server_time = 0.0;
 
-                match listen_options.nk_peer_messaging && len > 0 {
+                match listen_options.nk_peer && len > 0 {
                     false => {
                         writer.write_all(&buffer).await?;
                     }
@@ -54,8 +54,7 @@ impl TcpServer {
                         let data_string = &String::from_utf8_lossy(&buffer);
                         match nk_msg_reader(data_string) {
                             Some(mut m) => {
-                                let connection_time =
-                                    calc_connect_ms(m.send_timestamp, receive_time_stamp);
+                                let connection_time = calc_connect_ms(m.send_timestamp, receive_time_stamp);
                                 client_server_time = connection_time;
 
                                 m.receive_time_utc = receive_time_utc;
@@ -77,7 +76,7 @@ impl TcpServer {
                     &stream.local_addr()?.to_string(),
                     client_server_time,
                 );
-                output_handler(LogLevel::INFO, &msg, &output_options).await;
+                log_handler(LogLevel::INFO, &msg, &logging_options).await;
 
                 // Flush buffer
                 buffer.clear();
@@ -93,7 +92,7 @@ impl Default for TcpServer {
         Self {
             listen_ip: BIND_ADDR_IPV4.to_owned(),
             listen_port: BIND_PORT,
-            output_options: OutputOptions::default(),
+            logging_options: LoggingOptions::default(),
             listen_options: ListenOptions::default(),
         }
     }

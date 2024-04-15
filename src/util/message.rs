@@ -6,11 +6,6 @@ use tabled::Table;
 
 use crate::core::common::{ClientResult, ConnectMethod, ConnectRecord, ConnectResult, HostRecord};
 
-/// Return the CLI header message
-pub fn cli_header_msg() -> String {
-    "NetKraken - Cross platform network connectivity tester\n".to_string()
-}
-
 /// Return server start message
 pub fn server_start_msg(protocol: ConnectMethod, bind_addr: &IpAddr, bind_port: &u16) -> String {
     let addr = match bind_addr.is_ipv6() {
@@ -153,6 +148,7 @@ mod tests {
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
     use crate::core::common::HostRecord;
+    use crate::core::konst::CLI_HEADER_MSG;
     use crate::util::message::*;
 
     #[test]
@@ -173,10 +169,7 @@ mod tests {
         let host_record = HostRecord {
             host: "blah.bleh".to_owned(),
             port: 443,
-            ipv4_sockets: vec![SocketAddr::new(
-                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-                443,
-            )],
+            ipv4_sockets: vec![SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 443)],
             ipv6_sockets: vec![],
         };
         let msg = resolved_ips_msg(&host_record);
@@ -190,10 +183,7 @@ mod tests {
             host: "blah.bleh".to_owned(),
             port: 443,
             ipv4_sockets: vec![],
-            ipv6_sockets: vec![SocketAddr::new(
-                IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
-                443,
-            )],
+            ipv6_sockets: vec![SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 443)],
         };
         let msg = resolved_ips_msg(&host_record);
 
@@ -205,14 +195,8 @@ mod tests {
         let host_record = HostRecord {
             host: "blah.bleh".to_owned(),
             port: 443,
-            ipv4_sockets: vec![SocketAddr::new(
-                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-                443,
-            )],
-            ipv6_sockets: vec![SocketAddr::new(
-                IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
-                443,
-            )],
+            ipv4_sockets: vec![SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 443)],
+            ipv6_sockets: vec![SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 443)],
         };
         let msg = resolved_ips_msg(&host_record);
 
@@ -228,10 +212,8 @@ mod tests {
 
     #[test]
     fn cli_header_msg_is_expected() {
-        let msg = cli_header_msg();
-
         assert_eq!(
-            msg,
+            CLI_HEADER_MSG,
             "NetKraken - Cross platform network connectivity tester\n"
         );
     }
@@ -307,9 +289,6 @@ mod tests {
             0.0,
         );
 
-        assert_eq!(
-            msg,
-            "ping => proto=TCP src=127.0.0.1:13337 dst=127.0.0.1:8080",
-        );
+        assert_eq!(msg, "ping => proto=TCP src=127.0.0.1:13337 dst=127.0.0.1:8080",);
     }
 }

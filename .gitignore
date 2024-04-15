@@ -3,4 +3,6 @@
 # editors
 .vscode/
 
-*.log
+# NetKraken
+nk.log
+nk.toml

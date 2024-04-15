@@ -107,14 +107,8 @@ mod tests {
         let host_record = HostRecord {
             host: "blah.bleh".to_owned(),
             port: 443,
-            ipv4_sockets: vec![SocketAddr::new(
-                IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-                443,
-            )],
-            ipv6_sockets: vec![SocketAddr::new(
-                IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
-                443,
-            )],
+            ipv4_sockets: vec![SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 443)],
+            ipv6_sockets: vec![SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)), 443)],
         };
         let host = host_record.host.to_owned();
         let ipv4_sockets = host_record.ipv4_sockets.clone();
