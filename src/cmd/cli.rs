@@ -134,8 +134,6 @@ impl Cli {
             }
         };
 
-        println!("{:#?}", config);
-
         let ip_options = IpOptions {
             ip_protocol: if cli.ip_proto != IpProtocol::V4 { cli.ip_proto } else { config.ip_options.ip_protocol },
         };
