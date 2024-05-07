@@ -3,8 +3,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use anyhow::{bail, Result};
-use futures::{stream, StreamExt};
-use tokio::io::AsyncWriteExt;
+use futures::StreamExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpSocket;
 use tokio::signal;
 use tokio::time::{timeout, Duration};
@@ -13,11 +13,11 @@ use crate::core::common::{
     ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions,
     IpPort, IpProtocol, LoggingOptions, NetKrakenMessage, PingOptions,
 };
-use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE};
+use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE, MAX_PACKET_SIZE};
 use crate::util::dns::resolve_host;
 use crate::util::handler::{io_error_switch_handler, log_handler2, loop_handler};
 use crate::util::message::{client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg};
-use crate::util::parser::parse_ipaddr;
+use crate::util::parser::{nk_msg_reader, parse_ipaddr};
 use crate::util::result::{client_summary_result, get_results_map};
 use crate::util::time::{calc_connect_ms, time_now_us};
 
@@ -299,17 +299,39 @@ async fn connect_host(
 
                 // TODO:
                 // send/receive nk message
-                let nk_msg = NetKrakenMessage::new(
+                let mut nk_msg = NetKrakenMessage::new(
                     &stream_id.to_string(),
                     &conn_record.source,
                     &conn_record.destination,
                     ConnectMethod::TCP,
                 )
                 .unwrap();
+
+                nk_msg.round_trip_time_ms = connection_time;
+
+                // println!("{:#?}", nk_msg);
+
                 if ping_options.nk_peer {
+                    let (mut rx, mut tx) = stream.split();
+
                     // Send the NetKraken message
                     let nk_msg_json = nk_msg.to_json().unwrap();
-                    stream.write_all(nk_msg_json.as_bytes()).await.unwrap();
+                    // stream.write_all(nk_msg_json.as_bytes()).await.unwrap();
+
+                    let mut buffer = vec![0u8; MAX_PACKET_SIZE];
+                    tx.write_all(nk_msg_json.as_bytes()).await.unwrap();
+                    rx.read(&mut buffer).await.unwrap();
+
+                    let data_string = &String::from_utf8_lossy(&buffer);
+                    match nk_msg_reader(data_string) {
+                        Some(m) => {
+                            println!("here");
+                            println!("{:#?}", m);
+                        }
+                        None => {
+                            println!("{}", data_string);
+                        }
+                    }
                 };
             }
             // Connection timeout

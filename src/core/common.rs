@@ -238,8 +238,6 @@ pub struct NetKrakenMessage {
     pub receive_time_utc: String,
     pub receive_timestamp: u128,
     pub one_way_time_ms: f64,
-    pub round_trip_time_utc: String,
-    pub round_trip_timestamp: u128,
     pub round_trip_time_ms: f64,
     pub source: String,
     pub destination: String,
