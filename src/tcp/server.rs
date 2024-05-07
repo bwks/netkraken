@@ -60,6 +60,9 @@ impl TcpServer {
                                 m.receive_time_utc = receive_time_utc;
                                 m.receive_timestamp = receive_time_stamp;
                                 m.one_way_time_ms = connection_time;
+                                m.nk_peer = true;
+
+                                println!("{:#?}", m);
 
                                 let json_message = serde_json::to_string(&m)?;
                                 writer.write_all(json_message.as_bytes()).await?;

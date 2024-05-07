@@ -3,14 +3,15 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use anyhow::{bail, Result};
-use futures::StreamExt;
+use futures::{stream, StreamExt};
+use tokio::io::AsyncWriteExt;
 use tokio::net::TcpSocket;
 use tokio::signal;
 use tokio::time::{timeout, Duration};
 
 use crate::core::common::{
     ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions,
-    IpPort, IpProtocol, LoggingOptions, PingOptions,
+    IpPort, IpProtocol, LoggingOptions, NetKrakenMessage, PingOptions,
 };
 use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE};
 use crate::util::dns::resolve_host;
@@ -131,6 +132,8 @@ impl TcpClient {
             c.store(true, Ordering::SeqCst);
         });
 
+        let stream_id = uuid::Uuid::new_v4();
+
         loop {
             if cancel.load(Ordering::SeqCst) {
                 break;
@@ -145,7 +148,7 @@ impl TcpClient {
                     let src_ip_port = src_ip_port.clone();
                     async move {
                         //
-                        process_host(src_ip_port, host_record, self.ping_options, self.ip_options).await
+                        process_host(src_ip_port, host_record, self.ping_options, self.ip_options, stream_id).await
                     }
                 })
                 .buffer_unordered(BUFFER_SIZE)
@@ -193,6 +196,7 @@ async fn process_host(
     host_record: HostRecord,
     ping_options: PingOptions,
     ip_options: IpOptions,
+    stream_id: uuid::Uuid,
 ) -> HostResults {
     // Create a vector of sockets based on the IP protocol.
     let sockets = match ip_options.ip_protocol {
@@ -206,7 +210,7 @@ async fn process_host(
             let src_ip_port = src_ip_port.clone();
             async move {
                 //
-                connect_host(src_ip_port, dst_socket, ping_options).await
+                connect_host(src_ip_port, dst_socket, ping_options, stream_id).await
             }
         })
         .buffer_unordered(BUFFER_SIZE)
@@ -219,7 +223,12 @@ async fn process_host(
     }
 }
 
-async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOptions) -> ConnectRecord {
+async fn connect_host(
+    src: IpPort,
+    dst_socket: SocketAddr,
+    ping_options: PingOptions,
+    stream_id: uuid::Uuid,
+) -> ConnectRecord {
     let (bind_addr, src_socket) = match &dst_socket.is_ipv4() {
         // Bind the source socket to the same IP Version as the destination socket.
         true => {
@@ -272,7 +281,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
     let tick = Duration::from_millis(ping_options.timeout.into());
     match timeout(tick, src_socket.connect(dst_socket)).await {
         Ok(s) => match s {
-            Ok(stream) => {
+            Ok(mut stream) => {
                 // Update conn record
                 // Calculate the round trip time
                 let post_conn_timestamp = time_now_us();
@@ -290,6 +299,18 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
 
                 // TODO:
                 // send/receive nk message
+                let nk_msg = NetKrakenMessage::new(
+                    &stream_id.to_string(),
+                    &conn_record.source,
+                    &conn_record.destination,
+                    ConnectMethod::TCP,
+                )
+                .unwrap();
+                if ping_options.nk_peer {
+                    // Send the NetKraken message
+                    let nk_msg_json = nk_msg.to_json().unwrap();
+                    stream.write_all(nk_msg_json.as_bytes()).await.unwrap();
+                };
             }
             // Connection timeout
             Err(e) => {
