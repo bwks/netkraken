@@ -38,8 +38,14 @@ impl HttpClient {
         // Create a reqwest client with appropriate configuration
         let client = Client::new();
 
+        let protocol = match self.ping_options.method {
+            ConnectMethod::HTTP => "http",
+            ConnectMethod::HTTPS => "https", // TODO: Update to HTTPS
+            _ => bail!("UNKOWN HTTP PROTOCOL TYPE"),
+        };
+
         // Format the URL with proper HTTP prefix
-        let url = format!("http://{}:{}", self.dst_ip, self.dst_port);
+        let url = format!("{}://{}:{}", protocol, self.dst_ip, self.dst_port);
         println!("{url}");
         let response = client.get(url).send().await?;
         let status = response.status();

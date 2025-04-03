@@ -43,13 +43,14 @@ impl Display for ConnectResult {
 }
 
 #[allow(clippy::upper_case_acronyms)]
-#[derive(ValueEnum, Copy, Clone, Debug, Default, Serialize)]
+#[derive(ValueEnum, Copy, Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub enum ConnectMethod {
     #[default]
     TCP,
     UDP,
     // ICMP,
     HTTP,
+    HTTPS,
 }
 
 impl Display for ConnectMethod {
@@ -59,6 +60,7 @@ impl Display for ConnectMethod {
             ConnectMethod::UDP => write!(f, "udp"),
             // ConnectMethod::ICMP => write!(f, "icmp"),
             ConnectMethod::HTTP => write!(f, "http"),
+            ConnectMethod::HTTPS => write!(f, "https"),
         }
     }
 }
@@ -126,6 +128,7 @@ pub struct PingOptions {
     pub interval: u16,
     pub timeout: u16,
     pub nk_peer: bool,
+    pub method: ConnectMethod,
 }
 
 impl Default for PingOptions {
@@ -135,6 +138,7 @@ impl Default for PingOptions {
             interval: PING_INTERVAL,
             timeout: PING_TIMEOUT,
             nk_peer: PING_NK_PEER,
+            method: ConnectMethod::default(),
         }
     }
 }

@@ -40,7 +40,7 @@ pub struct Cli {
     pub timeout: u16,
 
     /// Connection Method
-    #[clap(short, long, default_value_t = ConnectMethod::TCP)]
+    #[clap(short, long, default_value_t = ConnectMethod::default())]
     pub method: ConnectMethod,
 
     /// IP Protocol to use
@@ -154,6 +154,7 @@ impl Cli {
             interval: if cli.interval != PING_INTERVAL { cli.interval } else { config.ping_options.interval },
             timeout: if cli.timeout != PING_TIMEOUT { cli.timeout } else { config.ping_options.timeout },
             nk_peer: if cli.nk_peer != PING_NK_PEER { cli.nk_peer } else { config.ping_options.nk_peer },
+            method: if cli.method != ConnectMethod::default() { cli.method } else { config.ping_options.method },
         };
 
         let listen_options = ListenOptions {
@@ -181,7 +182,7 @@ impl Cli {
         // endregion: ===== validators ===== //
 
         match cli.method {
-            ConnectMethod::HTTP => {
+            ConnectMethod::HTTP | ConnectMethod::HTTPS => {
                 let http_client = HttpClient {
                     dst_ip: host,
                     dst_port: port,
