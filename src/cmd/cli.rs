@@ -7,8 +7,7 @@ use crate::core::konst::{
     BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CLI_HEADER_MSG, CONFIG_FILE, CURRENT_DIR, LOGFILE_NAME, LOGGING_JSON,
     LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER, PING_REPEAT, PING_TIMEOUT,
 };
-use crate::http;
-use crate::http::client::http_client;
+use crate::http::client::HttpClient;
 use crate::tcp::client::TcpClient;
 use crate::tcp::server::TcpServer;
 use crate::udp::client::UdpClient;
@@ -183,7 +182,17 @@ impl Cli {
 
         match cli.method {
             ConnectMethod::HTTP => {
-                let _ = http_client().await;
+                let http_client = HttpClient {
+                    dst_ip: host,
+                    dst_port: port,
+                    src_ipv4: None,
+                    src_ipv6: None,
+                    src_port: 0,
+                    logging_options,
+                    ping_options,
+                    ip_options,
+                };
+                http_client.connect().await?;
             }
             // ConnectMethod::ICMP => println!("icmp not implemented"),
             ConnectMethod::TCP => {
