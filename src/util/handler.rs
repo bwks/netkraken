@@ -13,7 +13,7 @@ use crate::core::konst::APP_NAME;
 /// * `loop_counter` - The loop iteration count
 /// * `num_repeats` - How many times the loop should num_repeats
 /// * `sleep_interval` - How long the loop should sleep for between iterations
-///  
+///
 /// ## Break conditions
 ///  * loop count == 65535 (u16 max value)
 ///  * loop count >= number of repeats

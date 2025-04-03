@@ -7,6 +7,8 @@ use crate::core::konst::{
     BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CLI_HEADER_MSG, CONFIG_FILE, CURRENT_DIR, LOGFILE_NAME, LOGGING_JSON,
     LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER, PING_REPEAT, PING_TIMEOUT,
 };
+use crate::http;
+use crate::http::client::http_client;
 use crate::tcp::client::TcpClient;
 use crate::tcp::server::TcpServer;
 use crate::udp::client::UdpClient;
@@ -180,7 +182,9 @@ impl Cli {
         // endregion: ===== validators ===== //
 
         match cli.method {
-            // ConnectMethod::HTTP => println!("http not implemented"),
+            ConnectMethod::HTTP => {
+                let _ = http_client().await;
+            }
             // ConnectMethod::ICMP => println!("icmp not implemented"),
             ConnectMethod::TCP => {
                 if cli.listen {

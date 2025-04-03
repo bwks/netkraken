@@ -49,7 +49,7 @@ pub enum ConnectMethod {
     TCP,
     UDP,
     // ICMP,
-    // HTTP,
+    HTTP,
 }
 
 impl Display for ConnectMethod {
@@ -58,7 +58,7 @@ impl Display for ConnectMethod {
             ConnectMethod::TCP => write!(f, "tcp"),
             ConnectMethod::UDP => write!(f, "udp"),
             // ConnectMethod::ICMP => write!(f, "icmp"),
-            // ConnectMethod::HTTP => write!(f, "http"),
+            ConnectMethod::HTTP => write!(f, "http"),
         }
     }
 }
