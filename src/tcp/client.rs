@@ -4,7 +4,6 @@ use std::sync::Arc;
 
 use anyhow::{bail, Result};
 use futures::StreamExt;
-use tokio::net::TcpSocket;
 use tokio::signal;
 use tokio::time::{timeout, Duration};
 
@@ -18,6 +17,7 @@ use crate::util::handler::{io_error_switch_handler, log_handler2, loop_handler};
 use crate::util::message::{client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg};
 use crate::util::parser::parse_ipaddr;
 use crate::util::result::{client_summary_result, get_results_map};
+use crate::util::socket::get_tcp_socket;
 use crate::util::time::{calc_connect_ms, time_now_us};
 
 #[derive(Debug)]
@@ -306,13 +306,4 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
         }
     };
     conn_record
-}
-
-fn get_tcp_socket(bind_addr: SocketAddr) -> Result<TcpSocket> {
-    let socket = match bind_addr.is_ipv4() {
-        true => TcpSocket::new_v4()?,
-        false => TcpSocket::new_v6()?,
-    };
-    socket.bind(bind_addr)?;
-    Ok(socket)
 }

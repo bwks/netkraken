@@ -20,6 +20,8 @@ pub enum ConnectResult {
     Pong,
 
     // Errors
+    ConnectError,
+    Error,
     Refused,
     Reset,
     Timeout,
@@ -33,6 +35,8 @@ impl Display for ConnectResult {
         match self {
             ConnectResult::Ping => write!(f, "ping"),
             ConnectResult::Pong => write!(f, "pong"),
+            ConnectResult::ConnectError => write!(f, "connect_error"),
+            ConnectResult::Error => write!(f, "error"),
             ConnectResult::Refused => write!(f, "refused"),
             ConnectResult::Reset => write!(f, "reset"),
             ConnectResult::Timeout => write!(f, "timeout"),
@@ -335,7 +339,7 @@ impl Display for HostRecord {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct IpPort {
     pub ipv4: IpAddr,
     pub ipv6: IpAddr,
