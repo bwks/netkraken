@@ -142,7 +142,6 @@ impl UdpClient {
 
             let host_results: Vec<HostResults> = futures::stream::iter(resolved_hosts.clone())
                 .map(|host_record| {
-                    let src_ip_port = src_ip_port.clone();
                     async move {
                         //
                         process_host(src_ip_port, host_record, self.ping_options, self.ip_options).await
@@ -202,7 +201,6 @@ async fn process_host(
 
     let results: Vec<ConnectRecord> = futures::stream::iter(sockets)
         .map(|dst_socket| {
-            let src_ip_port = src_ip_port.clone();
             async move {
                 //
                 connect_host(src_ip_port, dst_socket, ping_options).await

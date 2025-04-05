@@ -33,6 +33,7 @@ pub struct HttpClient {
     pub ip_options: IpOptions,
 }
 impl HttpClient {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         dst_ip: String,
         dst_port: u16,
@@ -141,7 +142,6 @@ impl HttpClient {
 
             let host_results: Vec<HostResults> = futures::stream::iter(resolved_hosts.clone())
                 .map(|host_record| {
-                    let src_ip_port = src_ip_port.clone();
                     async move {
                         //
                         process_host(src_ip_port, host_record, self.ping_options, self.ip_options).await
@@ -204,7 +204,6 @@ async fn process_host(
 
     let results: Vec<ConnectRecord> = futures::stream::iter(sockets)
         .map(|dst_socket| {
-            let src_ip_port = src_ip_port.clone();
             {
                 let host_record = host_record.clone();
                 async move {
