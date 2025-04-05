@@ -7,6 +7,7 @@ use crate::core::konst::{
     BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CLI_HEADER_MSG, CONFIG_FILE, CURRENT_DIR, LOGFILE_NAME, LOGGING_JSON,
     LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER, PING_REPEAT, PING_TIMEOUT,
 };
+use crate::http::client::HttpClient;
 use crate::tcp::client::TcpClient;
 use crate::tcp::server::TcpServer;
 use crate::udp::client::UdpClient;
@@ -39,7 +40,7 @@ pub struct Cli {
     pub timeout: u16,
 
     /// Connection Method
-    #[clap(short, long, default_value_t = ConnectMethod::TCP)]
+    #[clap(short, long, default_value_t = ConnectMethod::default())]
     pub method: ConnectMethod,
 
     /// IP Protocol to use
@@ -153,6 +154,7 @@ impl Cli {
             interval: if cli.interval != PING_INTERVAL { cli.interval } else { config.ping_options.interval },
             timeout: if cli.timeout != PING_TIMEOUT { cli.timeout } else { config.ping_options.timeout },
             nk_peer: if cli.nk_peer != PING_NK_PEER { cli.nk_peer } else { config.ping_options.nk_peer },
+            method: if cli.method != ConnectMethod::default() { cli.method } else { config.ping_options.method },
         };
 
         let listen_options = ListenOptions {
@@ -180,7 +182,19 @@ impl Cli {
         // endregion: ===== validators ===== //
 
         match cli.method {
-            // ConnectMethod::HTTP => println!("http not implemented"),
+            ConnectMethod::HTTP | ConnectMethod::HTTPS => {
+                let http_client = HttpClient::new(
+                    host,
+                    port,
+                    Some(cli.src_v4),
+                    Some(cli.src_v6),
+                    Some(cli.src_port),
+                    logging_options,
+                    ping_options,
+                    ip_options,
+                );
+                http_client.connect().await?;
+            }
             // ConnectMethod::ICMP => println!("icmp not implemented"),
             ConnectMethod::TCP => {
                 if cli.listen {

@@ -71,7 +71,9 @@ pub fn client_result_msg(record: &ConnectRecord) -> String {
                 record.time,
             )
         }
-        ConnectResult::Refused
+        ConnectResult::ConnectError
+        | ConnectResult::Error
+        | ConnectResult::Refused
         | ConnectResult::Reset
         | ConnectResult::Timeout
         | ConnectResult::Unknown

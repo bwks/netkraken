@@ -1,5 +1,6 @@
 mod cmd;
 mod core;
+mod http;
 mod tcp;
 mod udp;
 mod util;
