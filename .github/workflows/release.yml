@@ -62,11 +62,15 @@ jobs:
             os: "windows-latest"
     runs-on: ${{ matrix.os }}
     steps:
-      - name: "Install Openssl"
+      - name: "Install Openssl Ubuntu"
         if: matrix.os == 'ubuntu-latest'
         run: |
-          sudo apt-get install pkg-config
-          sudo apt install libssl-dev
+          sudo apt-get install pkg-config libssl-dev
+
+      - name: "Install Openssl Alpine"
+        if: matrix.os == 'alpine-latest'
+        run: |
+          apk add openssl-dev musl-dev
 
       - name: "Check out the repo"
         uses: actions/checkout@v4
