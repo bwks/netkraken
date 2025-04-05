@@ -65,6 +65,7 @@ jobs:
       - name: "Install Openssl"
         if: matrix.os == 'ubuntu-latest'
         run: |
+          sudo apt-get install pkg-config
           sudo apt install libssl-dev
 
       - name: "Check out the repo"
