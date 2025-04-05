@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use anyhow::{bail, Result};
 use futures::StreamExt;
+use hyper_util::client::legacy::connect::HttpInfo;
 use reqwest::Client;
 use tokio::signal;
 use tokio::time::Duration;
@@ -300,14 +301,22 @@ async fn connect_host(
 
     let url = format!("{protocol}://{}", host_record.host);
 
-    match http_client.get(url.clone()).send().await {
-        Ok(_) => {
+    match http_client.get(url.clone()).header("Connection", "close").send().await {
+        Ok(response) => {
             let post_conn_timestamp = time_now_us();
             let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
             conn_record.success = true;
             conn_record.time = connection_time;
             conn_record.result = ConnectResult::Pong;
-            // r.status().as_u16();
+
+            let local_ip = response
+                .extensions()
+                .get::<HttpInfo>()
+                .map(|info| info.local_addr().ip());
+            if local_ip.is_some() {
+                // This will always be some
+                conn_record.source = local_ip.unwrap().to_string()
+            }
         }
         Err(e) => {
             conn_record.error_msg = Some(e.to_string());
