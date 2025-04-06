@@ -1,0 +1,20 @@
+# Build stage
+FROM rust:1.84-alpine AS builder
+
+# Install and Cache Build dependencies
+WORKDIR /app
+RUN mkdir ./src && echo 'fn main() { println!("Dummy!"); }' > ./src/main.rs
+COPY ["Cargo.toml", "Cargo.lock",  "./"]
+RUN cargo add openssl --features vendored
+RUN apk add --no-cache alpine-sdk openssl-dev musl-dev make perl
+
+RUN cargo build --release
+
+RUN rm -rf ./src
+COPY ./src ./src
+
+# The last modified attribute of main.rs needs to be updated manually,
+# otherwise cargo won't rebuild it.
+RUN touch -a -m ./src/main.rs
+
+RUN cargo build --release
