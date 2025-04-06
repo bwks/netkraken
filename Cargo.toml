@@ -1,6 +1,6 @@
 [package]
 name = "netkraken"
-version = "0.1.13"
+version = "0.1.14"
 edition = "2021"
 
 [[bin]]
@@ -9,35 +9,36 @@ path = "src/main.rs"
 
 [dependencies]
 # Errors
-anyhow = "1.0.72"
+anyhow = "1.0.97"
 
 # CLI
-clap = { version = "4.3.19", features = ["derive"] }
+clap = { version = "4.5.35", features = ["derive"] }
 
 # List IP addresses of all network interfaces
-local-ip-address = "0.6.1"
-
-futures = "0.3.28"
+local-ip-address = "0.6.3"
 
 # Serialization/Deserialization
-serde = "1.0.181"
-serde_derive = "1.0.181"
-serde_json = "1.0.104"
+serde = "1.0.219"
+serde_derive = "1.0.219"
+serde_json = "1.0.140"
 
 # Nice result output
 tabled = "0.18.0"
-tokio = { version = "1.44.1", features = ["full"] }
+
+# Async
+tokio = { version = "1.44.2", features = ["full"] }
 tokio-stream = "0.1.17"
+futures = "0.3.31"
 
 # Configuration
-toml = "0.8.12"
+toml = "0.8.20"
 
 # HTTP Client
 hyper-util = "0.1.11"
 reqwest = { version = "0.12.15", features = ["json", "rustls-tls"] }
 
-tracing = "0.1.37"
-tracing-subscriber = { version = "0.3.17", features = ["env-filter", "json"] }
-tracing-appender = "0.2.2"
+tracing = "0.1.41"
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
+tracing-appender = "0.2.3"
 time = "0.3.41"
-uuid = { version = "1.4.1", features = ["v4", "fast-rng"] }
+uuid = { version = "1.16.0", features = ["v4", "fast-rng"] }
