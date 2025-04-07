@@ -298,6 +298,10 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
                 // Calculate the round trip time
                 let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
 
+                if let Ok(local_addr) = reader.local_addr() {
+                    conn_record.source = local_addr.to_string();
+                }
+
                 conn_record.success = true;
                 conn_record.result = ConnectResult::Pong;
                 conn_record.time = connection_time;
