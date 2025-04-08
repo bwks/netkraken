@@ -1,7 +1,7 @@
 # NetKraken
 
 NetKraken is a Network connectivity tester inspired by `nc`, `ncat` and the `netcat`s 
-of the world. 
+of the world.
 
 > # 🚧 work in progress 🚧
 
@@ -11,12 +11,13 @@ of the world.
  3) Cross platform support, with Windows as a first class citizen
 
 ## Current Features
- - TCP/UDP Client/Server 
+ - TCP/UDP Client/Server
+ - HTTP Client
  - Asynchronous servers allowing for large amounts of client connections
  - Asynchronous clients allow for simultaneous connections to multiple destinations
 
 ## Planned Features
- - HTTP Client
+ - HTTP Server
  - DNS Client
  - TCP/UDP traceroute
  - Latency, Jitter, Bandwidth measurement

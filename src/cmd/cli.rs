@@ -7,6 +7,7 @@ use crate::core::konst::{
     BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CLI_HEADER_MSG, CONFIG_FILE, CURRENT_DIR, LOGFILE_NAME, LOGGING_JSON,
     LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER, PING_REPEAT, PING_TIMEOUT,
 };
+use crate::dns::client::DnsClient;
 use crate::http::client::HttpClient;
 use crate::tcp::client::TcpClient;
 use crate::tcp::server::TcpServer;
@@ -182,6 +183,19 @@ impl Cli {
         // endregion: ===== validators ===== //
 
         match cli.method {
+            ConnectMethod::DNS => {
+                let dns_client = DnsClient::new(
+                    host,
+                    port,
+                    Some(cli.src_v4),
+                    Some(cli.src_v6),
+                    Some(cli.src_port),
+                    logging_options,
+                    ping_options,
+                    ip_options,
+                );
+                dns_client.connect().await?;
+            }
             ConnectMethod::HTTP | ConnectMethod::HTTPS => {
                 let http_client = HttpClient::new(
                     host,

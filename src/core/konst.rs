@@ -16,3 +16,4 @@ pub const PING_TIMEOUT: u16 = 3000;
 pub const PING_INTERVAL: u16 = 1000;
 pub const PING_NK_PEER: bool = false;
 pub const CLI_HEADER_MSG: &str = "NetKraken - Cross platform network connectivity tester\n";
+pub const DNS_LOOKUP_DOMAIN: &str = "www.microsoft.com";

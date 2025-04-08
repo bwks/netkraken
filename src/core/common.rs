@@ -52,6 +52,8 @@ pub enum ConnectMethod {
     #[default]
     TCP,
     UDP,
+
+    DNS,
     // ICMP,
     HTTP,
     HTTPS,
@@ -63,6 +65,7 @@ impl Display for ConnectMethod {
             ConnectMethod::TCP => write!(f, "tcp"),
             ConnectMethod::UDP => write!(f, "udp"),
             // ConnectMethod::ICMP => write!(f, "icmp"),
+            ConnectMethod::DNS => write!(f, "dns"),
             ConnectMethod::HTTP => write!(f, "http"),
             ConnectMethod::HTTPS => write!(f, "https"),
         }
