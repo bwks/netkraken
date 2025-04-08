@@ -1,11 +1,13 @@
-use anyhow::{bail, Result};
-use clap::Parser;
+use anyhow::Result;
+use clap::{Args, Parser, Subcommand};
 
-use crate::core::common::{ConnectMethod, IpOptions, IpProtocol, ListenOptions, LoggingOptions, PingOptions};
+use crate::core::common::{
+    ConnectMethod, IpOptions, IpProtocol, ListenOptions, LoggingOptions, PingOptions, Transport,
+};
 use crate::core::config::Config;
 use crate::core::konst::{
-    BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CLI_HEADER_MSG, CONFIG_FILE, CURRENT_DIR, LOGFILE_NAME, LOGGING_JSON,
-    LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER, PING_REPEAT, PING_TIMEOUT,
+    BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CLI_HEADER_MSG, CONFIG_FILE, CURRENT_DIR, DNS_LOOKUP_DOMAIN, DNS_PORT,
+    LOGFILE_NAME, LOGGING_JSON, LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER, PING_REPEAT, PING_TIMEOUT,
 };
 use crate::dns::client::DnsClient;
 use crate::http::client::HttpClient;
@@ -15,18 +17,43 @@ use crate::udp::client::UdpClient;
 use crate::udp::server::UdpServer;
 use crate::util::validate::validate_local_ip;
 
-#[derive(Debug, Parser)]
-#[command(name = "nk")]
-#[command(bin_name = "nk")]
-#[command(version = env!("CARGO_PKG_VERSION"))]
-#[command(about = "NetKraken - Cross platform network connectivity tester", long_about = None)]
-pub struct Cli {
+#[derive(Debug, Subcommand)]
+pub enum Command {
+    /// DNS connection
+    Dns {
+        /// Target DNS servers
+        #[clap(short, long)]
+        servers: String,
+
+        /// DNS port
+        #[clap(short, long, default_value_t = DNS_PORT)]
+        port: u16,
+
+        /// Test DNS domain
+        #[clap(short, long, default_value = DNS_LOOKUP_DOMAIN)]
+        domain: String,
+
+        /// Transport protocol
+        #[clap(short, long, default_value_t = Transport::default())]
+        transport: Transport,
+    },
+    /// HTTP connection
+    Http,
+
+    /// TCP connection
+    Tcp,
+    /// UDP connection
+    Udp,
+}
+
+#[derive(Debug, Args)]
+pub struct SharedOptions {
     /// Destination hostname or IP address
-    pub host: Option<String>,
+    host: Option<String>,
 
     /// Destination port or
     /// Listen port in `-l --listen` mode
-    pub port: Option<u16>,
+    port: Option<u16>,
 
     /// Repeat count (0 == max == 65535)
     #[clap(short, long, default_value_t = PING_REPEAT)]
@@ -102,6 +129,19 @@ pub struct Cli {
     pub quiet: bool,
 }
 
+#[derive(Debug, Parser)]
+#[command(name = "nk")]
+#[command(bin_name = "nk")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
+#[command(about = "NetKraken - Cross platform network connectivity tester", long_about = None)]
+pub struct Cli {
+    #[clap(subcommand)]
+    command: Command,
+
+    #[clap(flatten)]
+    pub shared_options: SharedOptions,
+}
+
 impl Cli {
     pub fn init() -> Cli {
         Cli::parse()
@@ -109,7 +149,8 @@ impl Cli {
 
     pub async fn run(&self) -> Result<()> {
         println!("{CLI_HEADER_MSG}");
-        let cli = Cli::parse();
+        let cli_top = Cli::parse();
+        let cli = cli_top.shared_options;
 
         // region:    ===== pre-required args ===== //
 
@@ -124,9 +165,9 @@ impl Cli {
         // from the CLI, we should error out.
         let host = cli.host.unwrap_or_default();
         let port = cli.port.unwrap_or_default();
-        if host.is_empty() || port == 0 {
-            bail!("Destination host and port are required.");
-        }
+        // if host.is_empty() || port == 0 {
+        //     bail!("Destination host and port are required.");
+        // }
 
         let config = match Config::load(&cli.config) {
             Ok(config) => {
@@ -150,7 +191,7 @@ impl Cli {
         // If a CLI option is NOT the same as the default,
         // the option was set from the CLI. Therefore we should
         // use the CLI option. Otherwise use the config file option.
-        let ping_options = PingOptions {
+        let mut ping_options = PingOptions {
             repeat: if cli.repeat != PING_REPEAT { cli.repeat } else { config.ping_options.repeat },
             interval: if cli.interval != PING_INTERVAL { cli.interval } else { config.ping_options.interval },
             timeout: if cli.timeout != PING_TIMEOUT { cli.timeout } else { config.ping_options.timeout },
@@ -182,6 +223,33 @@ impl Cli {
 
         // endregion: ===== validators ===== //
 
+        match cli_top.command {
+            Command::Dns {
+                servers,
+                port,
+                domain,
+                transport,
+            } => {
+                ping_options.method = match transport {
+                    Transport::Tcp => ConnectMethod::TCP,
+                    Transport::Udp => ConnectMethod::UDP,
+                };
+                let dns_client = DnsClient::new(
+                    servers,
+                    port,
+                    Some(cli.src_v4.clone()),
+                    Some(cli.src_v6.clone()),
+                    Some(cli.src_port),
+                    domain,
+                    transport,
+                    logging_options.clone(),
+                    ping_options.clone(),
+                    ip_options,
+                );
+                dns_client.connect().await?;
+            }
+            _ => {}
+        }
         match cli.method {
             ConnectMethod::DNS => {
                 let dns_client = DnsClient::new(
@@ -190,6 +258,8 @@ impl Cli {
                     Some(cli.src_v4),
                     Some(cli.src_v6),
                     Some(cli.src_port),
+                    DNS_LOOKUP_DOMAIN.to_owned(),
+                    Transport::Tcp,
                     logging_options,
                     ping_options,
                     ip_options,

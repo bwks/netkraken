@@ -18,7 +18,7 @@ use crate::core::konst::APP_NAME;
 async fn main() -> ExitCode {
     let cli = Cli::init();
 
-    let file_appender = rolling::never(&cli.dir, &cli.file);
+    let file_appender = rolling::never(&cli.shared_options.dir, &cli.shared_options.file);
     let (logfile, _guard) = tracing_appender::non_blocking(file_appender);
 
     let tracer = tracing_subscriber::fmt()
@@ -26,7 +26,7 @@ async fn main() -> ExitCode {
         .with_writer(logfile)
         .with_ansi(false);
 
-    match cli.json {
+    match cli.shared_options.json {
         true => tracer.json().init(),
         false => tracer.init(),
     }

@@ -11,8 +11,8 @@ use futures::StreamExt;
 use tokio::signal;
 
 use crate::core::common::{
-    ClientResult, ClientSummary, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions, IpPort, IpProtocol,
-    LoggingOptions, PingOptions,
+    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions,
+    IpPort, IpProtocol, LoggingOptions, PingOptions, Transport,
 };
 use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE, DNS_LOOKUP_DOMAIN};
 use crate::util::dns::resolve_host;
@@ -29,6 +29,8 @@ pub struct DnsClient {
     pub src_ipv4: Option<IpAddr>,
     pub src_ipv6: Option<IpAddr>,
     pub src_port: u16,
+    pub domain: String,
+    pub transport: Transport,
     pub logging_options: LoggingOptions,
     pub ping_options: PingOptions,
     pub ip_options: IpOptions,
@@ -42,6 +44,8 @@ impl DnsClient {
         src_ipv4: Option<String>,
         src_ipv6: Option<String>,
         src_port: Option<u16>,
+        domain: String,
+        transport: Transport,
         logging_options: LoggingOptions,
         ping_options: PingOptions,
         ip_options: IpOptions,
@@ -64,6 +68,8 @@ impl DnsClient {
             src_ipv4,
             src_ipv6,
             src_port,
+            domain,
+            transport,
             logging_options,
             ping_options,
             ip_options,
@@ -268,10 +274,15 @@ async fn connect_host(
         });
     }
 
+    let transport_protocol = match ping_options.method {
+        ConnectMethod::TCP => Protocol::Tcp,
+        ConnectMethod::UDP => Protocol::Udp,
+        _ => Protocol::Udp,
+    };
     // Configure resolver for this server
     let ns_config = NameServerConfig {
         socket_addr: dst_socket,
-        protocol: Protocol::Udp,
+        protocol: transport_protocol,
         http_endpoint: None,
         tls_dns_name: None,
         trust_negative_responses: false,
