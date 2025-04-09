@@ -1,6 +1,7 @@
 use hickory_resolver::config::{NameServerConfig, ResolverConfig};
+use hickory_resolver::name_server::TokioConnectionProvider;
 use hickory_resolver::proto::xfer::Protocol;
-use hickory_resolver::{name_server::TokioConnectionProvider, Resolver};
+use hickory_resolver::Resolver;
 
 use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -280,6 +281,7 @@ async fn connect_host(
     let mut config = ResolverConfig::new();
     config.add_name_server(ns_config);
 
+    // Build resolver with our config and options
     let resolver = Resolver::builder_with_config(config, TokioConnectionProvider::default()).build();
 
     let mut conn_record = ConnectRecord {
@@ -302,6 +304,7 @@ async fn connect_host(
             conn_record.success = true;
             conn_record.time = connection_time;
             conn_record.result = ConnectResult::Pong;
+            // reponse.as_lookup().record_iter().
         }
         Err(e) => {
             println!("{}", e);
