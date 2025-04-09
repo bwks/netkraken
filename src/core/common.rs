@@ -72,7 +72,7 @@ impl Display for ConnectMethod {
     }
 }
 
-#[derive(Debug, Default, Clone, ValueEnum)]
+#[derive(Debug, Default, Clone, ValueEnum, PartialEq)]
 pub enum Transport {
     Tcp,
     #[default]

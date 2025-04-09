@@ -11,85 +11,55 @@ use futures::StreamExt;
 use tokio::signal;
 
 use crate::core::common::{
-    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions,
-    IpPort, IpProtocol, LoggingOptions, PingOptions, Transport,
+    ClientResult, ClientSummary, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions, IpPort, IpProtocol,
+    LoggingOptions, PingOptions, Transport,
 };
-use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE, DNS_LOOKUP_DOMAIN};
+use crate::core::konst::BUFFER_SIZE;
 use crate::util::dns::resolve_host;
 use crate::util::handler::{log_handler2, loop_handler};
 use crate::util::message::{client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg};
-use crate::util::parser::parse_ipaddr;
 use crate::util::result::{client_summary_result, get_results_map};
 use crate::util::socket::get_tcp_socket;
 use crate::util::time::{calc_connect_ms, time_now_us};
 
-pub struct DnsClient {
-    pub dst_ip: String,
-    pub dst_port: u16,
-    pub src_ipv4: Option<IpAddr>,
-    pub src_ipv6: Option<IpAddr>,
-    pub src_port: u16,
-    pub domain: String,
+#[derive(Debug, Clone)]
+pub struct DnsClientOptions {
+    pub remote_host: Vec<String>,
+    pub remote_port: u16,
+    pub local_ipv4: IpAddr,
+    pub local_ipv6: IpAddr,
+    pub local_port: u16,
     pub transport: Transport,
+    pub domain: String,
+}
+
+pub struct DnsClient {
+    pub dns_client_options: DnsClientOptions,
     pub logging_options: LoggingOptions,
     pub ping_options: PingOptions,
     pub ip_options: IpOptions,
 }
 
 impl DnsClient {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        dst_ip: String,
-        dst_port: u16,
-        src_ipv4: Option<String>,
-        src_ipv6: Option<String>,
-        src_port: Option<u16>,
-        domain: String,
-        transport: Transport,
-        logging_options: LoggingOptions,
-        ping_options: PingOptions,
-        ip_options: IpOptions,
-    ) -> DnsClient {
-        let src_ipv4 = match src_ipv4 {
-            Some(x) => parse_ipaddr(&x).ok(),
-            None => parse_ipaddr(BIND_ADDR_IPV4).ok(),
-        };
-
-        let src_ipv6 = match src_ipv6 {
-            Some(x) => parse_ipaddr(&x).ok(),
-            None => parse_ipaddr(BIND_ADDR_IPV6).ok(),
-        };
-
-        let src_port = src_port.unwrap_or(BIND_PORT);
-
-        DnsClient {
-            dst_ip,
-            dst_port,
-            src_ipv4,
-            src_ipv6,
-            src_port,
-            domain,
-            transport,
-            logging_options,
-            ping_options,
-            ip_options,
-        }
-    }
     pub async fn connect(&self) -> Result<()> {
-        let src_ip_port = IpPort {
-            // These should never be None at this point as they are set in the TcpClient::new() constructor.
-            ipv4: self.src_ipv4.unwrap(),
-            ipv6: self.src_ipv6.unwrap(),
-            port: self.src_port,
+        let local_ip_port = IpPort {
+            ipv4: self.dns_client_options.local_ipv4,
+            ipv6: self.dns_client_options.local_ipv6,
+            port: self.dns_client_options.local_port,
         };
 
         // Resolve the destination host to IPv4 and IPv6 addresses.
-        let host_records = HostRecord::new(&self.dst_ip, self.dst_port).await;
-        let hosts = vec![host_records.clone()];
-        let resolved_hosts = resolve_host(hosts).await;
+
+        let mut host_records = vec![];
+        for host in self.dns_client_options.remote_host.iter() {
+            host_records.push(HostRecord::new(&host, self.dns_client_options.remote_port).await);
+        }
+
+        let resolved_hosts = resolve_host(host_records).await;
 
         // Check if the host resolved to an IPv4 or IPv6 addresses.
         // If not, return an error.
+
         for record in &resolved_hosts {
             match record.ipv4_sockets.is_empty() && record.ipv6_sockets.is_empty() {
                 true => bail!("{} did not resolve to an IP address", record.host),
@@ -125,7 +95,11 @@ impl DnsClient {
         let mut count: u16 = 0;
         let mut send_count: u16 = 0;
 
-        let ping_header = ping_header_msg(&self.dst_ip, self.dst_port, self.ping_options.method);
+        let ping_header = ping_header_msg(
+            &self.dns_client_options.remote_host[0],
+            self.dns_client_options.remote_port,
+            self.ping_options.method,
+        );
         println!("{ping_header}");
 
         // This is a signal handler that listens for a Ctrl-C signal.
@@ -150,9 +124,17 @@ impl DnsClient {
 
             let host_results: Vec<HostResults> = futures::stream::iter(resolved_hosts.clone())
                 .map(|host_record| {
+                    let dns_client_options = self.dns_client_options.clone();
                     async move {
                         //
-                        process_host(src_ip_port, host_record, self.ping_options, self.ip_options).await
+                        process_host(
+                            local_ip_port,
+                            dns_client_options,
+                            host_record,
+                            self.ping_options,
+                            self.ip_options,
+                        )
+                        .await
                     }
                 })
                 .buffer_unordered(BUFFER_SIZE)
@@ -188,8 +170,12 @@ impl DnsClient {
         }
         client_results.sort_by_key(|x| x.destination.to_owned());
 
-        let summary_table =
-            client_summary_table_msg(&self.dst_ip, self.dst_port, self.ping_options.method, &client_results);
+        let summary_table = client_summary_table_msg(
+            &self.dns_client_options.remote_host[0],
+            self.dns_client_options.remote_port,
+            self.ping_options.method,
+            &client_results,
+        );
         println!("{}", summary_table);
 
         Ok(())
@@ -198,6 +184,7 @@ impl DnsClient {
 
 async fn process_host(
     src_ip_port: IpPort,
+    dns_client_options: DnsClientOptions,
     host_record: HostRecord,
     ping_options: PingOptions,
     ip_options: IpOptions,
@@ -213,10 +200,10 @@ async fn process_host(
     let results: Vec<ConnectRecord> = futures::stream::iter(sockets)
         .map(|dst_socket| {
             {
-                // let host_record = host_record.clone();
+                let dns_client_options = dns_client_options.clone();
                 async move {
                     //
-                    match connect_host(src_ip_port, dst_socket, ping_options).await {
+                    match connect_host(dns_client_options, src_ip_port, dst_socket, ping_options).await {
                         Ok(record) => record,
                         Err(e) => ConnectRecord {
                             result: ConnectResult::Unknown,
@@ -243,26 +230,27 @@ async fn process_host(
 
 async fn connect_host(
     // host_record: HostRecord,
-    src: IpPort,
+    dns_client_options: DnsClientOptions,
+    local: IpPort,
     dst_socket: SocketAddr,
     ping_options: PingOptions,
 ) -> Result<ConnectRecord> {
-    let (bind_addr, src_socket) = match &dst_socket.is_ipv4() {
+    let (bind_addr, local_socket) = match &dst_socket.is_ipv4() {
         // Bind the source socket to the same IP Version as the destination socket.
         true => {
-            let bind_ipv4_addr = SocketAddr::new(src.ipv4, src.port);
+            let bind_ipv4_addr = SocketAddr::new(local.ipv4, local.port);
             let socket = get_tcp_socket(bind_ipv4_addr).ok();
             (bind_ipv4_addr, socket)
         }
         false => {
-            let bind_ipv6_addr = SocketAddr::new(src.ipv6, src.port);
+            let bind_ipv6_addr = SocketAddr::new(local.ipv6, local.port);
             let socket = get_tcp_socket(bind_ipv6_addr).ok();
             (bind_ipv6_addr, socket)
         }
     };
 
     // If the source socket is None, we could not bind to the socket.
-    if src_socket.is_none() {
+    if local_socket.is_none() {
         return Ok(ConnectRecord {
             result: ConnectResult::BindError,
             protocol: ping_options.method,
@@ -274,11 +262,11 @@ async fn connect_host(
         });
     }
 
-    let transport_protocol = match ping_options.method {
-        ConnectMethod::TCP => Protocol::Tcp,
-        ConnectMethod::UDP => Protocol::Udp,
-        _ => Protocol::Udp,
+    let transport_protocol = match dns_client_options.transport {
+        Transport::Tcp => Protocol::Tcp,
+        Transport::Udp => Protocol::Udp,
     };
+
     // Configure resolver for this server
     let ns_config = NameServerConfig {
         socket_addr: dst_socket,
@@ -307,7 +295,7 @@ async fn connect_host(
     // record timestamp before connection
     let pre_conn_timestamp = time_now_us();
 
-    match resolver.lookup_ip(DNS_LOOKUP_DOMAIN).await {
+    match resolver.lookup_ip(dns_client_options.domain).await {
         Ok(_) => {
             let post_conn_timestamp = time_now_us();
             let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
@@ -315,7 +303,8 @@ async fn connect_host(
             conn_record.time = connection_time;
             conn_record.result = ConnectResult::Pong;
         }
-        Err(_) => {
+        Err(e) => {
+            println!("{}", e);
             conn_record.result = ConnectResult::Error;
         }
     }
