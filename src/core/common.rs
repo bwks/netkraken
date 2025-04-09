@@ -87,6 +87,26 @@ impl std::fmt::Display for HttpScheme {
     }
 }
 
+#[derive(Debug, Default, Clone, ValueEnum, PartialEq, Deserialize)]
+pub enum HttpVersion {
+    #[default]
+    #[value(name = "1")]
+    V1,
+    #[value(name = "2")]
+    V2,
+    #[value(name = "3")]
+    V3,
+}
+impl std::fmt::Display for HttpVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HttpVersion::V1 => write!(f, "1"),
+            HttpVersion::V2 => write!(f, "2"),
+            HttpVersion::V3 => write!(f, "3"),
+        }
+    }
+}
+
 #[derive(Debug, Default, Clone, ValueEnum, PartialEq)]
 pub enum Transport {
     Tcp,

@@ -2,7 +2,8 @@ use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use crate::core::common::{
-    ConnectMethod, HttpScheme, IpOptions, IpProtocol, ListenOptions, LoggingOptions, PingOptions, Transport,
+    ConnectMethod, HttpScheme, HttpVersion, IpOptions, IpProtocol, ListenOptions, LoggingOptions, PingOptions,
+    Transport,
 };
 use crate::core::config::Config;
 use crate::core::konst::{
@@ -65,9 +66,9 @@ pub enum Command {
         #[clap(short = 'p', long, default_value_t = HTTP_PORT, display_order = 2)]
         remote_port: u16,
 
-        /// Transport protocol
-        #[clap(short = 'T', long, default_value_t = Transport::default(), display_order = 51)]
-        transport: Transport,
+        /// HTTP Version
+        #[clap(short = 'V', long, default_value_t = HttpVersion::default(), display_order = 51)]
+        version: HttpVersion,
 
         #[clap(flatten)]
         shared_options: SharedOptions,
@@ -83,9 +84,9 @@ pub enum Command {
         #[clap(short = 'p', long, default_value_t = HTTPS_PORT, display_order = 2)]
         remote_port: u16,
 
-        /// Transport protocol
-        #[clap(short = 'T', long, default_value_t = Transport::default(), display_order = 51)]
-        transport: Transport,
+        /// HTTP Version
+        #[clap(short = 'V', long, default_value_t = HttpVersion::default(), display_order = 51)]
+        version: HttpVersion,
 
         #[clap(flatten)]
         shared_options: SharedOptions,
@@ -371,7 +372,7 @@ impl Cli {
             Command::Http {
                 remote_host,
                 remote_port,
-                transport,
+                version,
                 shared_options,
             } => {
                 let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
@@ -385,7 +386,7 @@ impl Cli {
                     local_ipv6,
                     local_port,
                     scheme: HttpScheme::Http,
-                    transport,
+                    version,
                 };
                 let http_client = HttpClient {
                     client_options: http_client_options,
@@ -398,7 +399,7 @@ impl Cli {
             Command::Https {
                 remote_host,
                 remote_port,
-                transport,
+                version,
                 shared_options,
             } => {
                 let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
@@ -412,7 +413,7 @@ impl Cli {
                     local_ipv6,
                     local_port,
                     scheme: HttpScheme::Https,
-                    transport,
+                    version,
                 };
                 let http_client = HttpClient {
                     client_options: http_client_options,

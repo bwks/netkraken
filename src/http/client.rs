@@ -5,13 +5,14 @@ use std::sync::Arc;
 use anyhow::{bail, Result};
 use futures::StreamExt;
 use hyper_util::client::legacy::connect::HttpInfo;
+use reqwest::header::HeaderMap;
 use reqwest::Client;
 use tokio::signal;
 use tokio::time::Duration;
 
 use crate::core::common::{
     ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, HttpScheme,
-    IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions, Transport,
+    HttpVersion, IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions, Transport,
 };
 use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE};
 use crate::util::dns::resolve_host;
@@ -30,7 +31,7 @@ pub struct HttpClientOptions {
     pub local_ipv6: IpAddr,
     pub local_port: u16,
     pub scheme: HttpScheme,
-    pub transport: Transport,
+    pub version: HttpVersion,
 }
 
 #[derive(Debug)]
@@ -217,7 +218,7 @@ async fn process_host(
                         Ok(record) => record,
                         Err(e) => ConnectRecord {
                             result: ConnectResult::Unknown,
-                            protocol: protocol,
+                            protocol,
                             source: src_ip_port.ipv4.to_string(),
                             destination: dst_socket.to_string(),
                             time: -1.0,
@@ -277,9 +278,13 @@ async fn connect_host(
         });
     }
 
+    let mut headers = HeaderMap::new();
+    headers.insert("x-custom-header", "netkraken".parse().unwrap());
+
     let http_client = match client_options.scheme {
         HttpScheme::Http => {
             Client::builder()
+                .default_headers(headers)
                 .redirect(reqwest::redirect::Policy::limited(10))
                 .resolve(&host_record.host, dst_socket) // Bypass DNS resolution as we have already resolved the IP
                 .timeout(Duration::from_millis(ping_options.timeout as u64))
@@ -288,6 +293,7 @@ async fn connect_host(
         }
         HttpScheme::Https => {
             Client::builder()
+                .default_headers(headers)
                 .danger_accept_invalid_certs(true)
                 .danger_accept_invalid_hostnames(true)
                 .tls_built_in_root_certs(true) // Use system root certificates
