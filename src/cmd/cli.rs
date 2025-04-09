@@ -2,15 +2,16 @@ use anyhow::Result;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 
 use crate::core::common::{
-    ConnectMethod, IpOptions, IpProtocol, ListenOptions, LoggingOptions, PingOptions, Transport,
+    ConnectMethod, HttpScheme, IpOptions, IpProtocol, ListenOptions, LoggingOptions, PingOptions, Transport,
 };
 use crate::core::config::Config;
 use crate::core::konst::{
     BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CLI_HEADER_MSG, CONFIG_FILE, CURRENT_DIR, DNS_LOOKUP_DOMAIN, DNS_PORT,
-    LOGFILE_NAME, LOGGING_JSON, LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER, PING_REPEAT, PING_TIMEOUT,
+    HTTPS_PORT, HTTP_PORT, LOGFILE_NAME, LOGGING_JSON, LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER,
+    PING_REPEAT, PING_TIMEOUT,
 };
 use crate::dns::client::{DnsClient, DnsClientOptions};
-use crate::http::client::HttpClient;
+use crate::http::client::{HttpClient, HttpClientOptions};
 use crate::tcp::client::TcpClient;
 use crate::tcp::server::TcpServer;
 use crate::udp::client::UdpClient;
@@ -55,7 +56,40 @@ pub enum Command {
         shared_options: SharedOptions,
     },
     /// HTTP connection
-    Http,
+    Http {
+        /// Remote host
+        #[clap(short = 'H', long, display_order = 1)]
+        remote_host: String,
+
+        /// Remote port
+        #[clap(short = 'p', long, default_value_t = HTTP_PORT, display_order = 2)]
+        remote_port: u16,
+
+        /// Transport protocol
+        #[clap(short = 'T', long, default_value_t = Transport::default(), display_order = 51)]
+        transport: Transport,
+
+        #[clap(flatten)]
+        shared_options: SharedOptions,
+    },
+
+    /// HTTP connection
+    Https {
+        /// Remote host
+        #[clap(short = 'H', long, display_order = 1)]
+        remote_host: String,
+
+        /// Remote port
+        #[clap(short = 'p', long, default_value_t = HTTPS_PORT, display_order = 2)]
+        remote_port: u16,
+
+        /// Transport protocol
+        #[clap(short = 'T', long, default_value_t = Transport::default(), display_order = 51)]
+        transport: Transport,
+
+        #[clap(flatten)]
+        shared_options: SharedOptions,
+    },
 
     /// TCP connection
     Tcp,
@@ -327,12 +361,66 @@ impl Cli {
                     domain,
                 };
                 let dns_client = DnsClient {
-                    dns_client_options,
+                    client_options: dns_client_options,
                     logging_options: logging_options.clone(),
                     ping_options: ping_options.clone(),
                     ip_options,
                 };
                 dns_client.connect().await?;
+            }
+            Command::Http {
+                remote_host,
+                remote_port,
+                transport,
+                shared_options,
+            } => {
+                let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
+                let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
+                let local_port = shared_options.local_port;
+
+                let http_client_options = HttpClientOptions {
+                    remote_host,
+                    remote_port,
+                    local_ipv4,
+                    local_ipv6,
+                    local_port,
+                    scheme: HttpScheme::Http,
+                    transport,
+                };
+                let http_client = HttpClient {
+                    client_options: http_client_options,
+                    logging_options,
+                    ping_options,
+                    ip_options,
+                };
+                http_client.connect().await?;
+            }
+            Command::Https {
+                remote_host,
+                remote_port,
+                transport,
+                shared_options,
+            } => {
+                let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
+                let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
+                let local_port = shared_options.local_port;
+
+                let http_client_options = HttpClientOptions {
+                    remote_host,
+                    remote_port,
+                    local_ipv4,
+                    local_ipv6,
+                    local_port,
+                    scheme: HttpScheme::Https,
+                    transport,
+                };
+                let http_client = HttpClient {
+                    client_options: http_client_options,
+                    logging_options,
+                    ping_options,
+                    ip_options,
+                };
+                http_client.connect().await?;
             }
             _ => {}
         }

@@ -10,8 +10,8 @@ use tokio::signal;
 use tokio::time::Duration;
 
 use crate::core::common::{
-    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions,
-    IpPort, IpProtocol, LoggingOptions, PingOptions,
+    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, HttpScheme,
+    IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions, Transport,
 };
 use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE};
 use crate::util::dns::resolve_host;
@@ -22,62 +22,38 @@ use crate::util::result::{client_summary_result, get_results_map};
 use crate::util::socket::get_tcp_socket;
 use crate::util::time::{calc_connect_ms, time_now_us};
 
+#[derive(Debug, Clone)]
+pub struct HttpClientOptions {
+    pub remote_host: String,
+    pub remote_port: u16,
+    pub local_ipv4: IpAddr,
+    pub local_ipv6: IpAddr,
+    pub local_port: u16,
+    pub scheme: HttpScheme,
+    pub transport: Transport,
+}
+
 #[derive(Debug)]
 pub struct HttpClient {
-    pub dst_ip: String,
-    pub dst_port: u16,
-    pub src_ipv4: Option<IpAddr>,
-    pub src_ipv6: Option<IpAddr>,
-    pub src_port: u16,
+    pub client_options: HttpClientOptions,
     pub logging_options: LoggingOptions,
     pub ping_options: PingOptions,
     pub ip_options: IpOptions,
 }
 impl HttpClient {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        dst_ip: String,
-        dst_port: u16,
-        src_ipv4: Option<String>,
-        src_ipv6: Option<String>,
-        src_port: Option<u16>,
-        logging_options: LoggingOptions,
-        ping_options: PingOptions,
-        ip_options: IpOptions,
-    ) -> HttpClient {
-        let src_ipv4 = match src_ipv4 {
-            Some(x) => parse_ipaddr(&x).ok(),
-            None => parse_ipaddr(BIND_ADDR_IPV4).ok(),
-        };
-
-        let src_ipv6 = match src_ipv6 {
-            Some(x) => parse_ipaddr(&x).ok(),
-            None => parse_ipaddr(BIND_ADDR_IPV6).ok(),
-        };
-
-        let src_port = src_port.unwrap_or(BIND_PORT);
-
-        HttpClient {
-            dst_ip,
-            dst_port,
-            src_ipv4,
-            src_ipv6,
-            src_port,
-            logging_options,
-            ping_options,
-            ip_options,
-        }
-    }
     pub async fn connect(&self) -> Result<()> {
         let src_ip_port = IpPort {
-            // These should never be None at this point as they are set in the TcpClient::new() constructor.
-            ipv4: self.src_ipv4.unwrap(),
-            ipv6: self.src_ipv6.unwrap(),
-            port: self.src_port,
+            ipv4: self.client_options.local_ipv4,
+            ipv6: self.client_options.local_ipv6,
+            port: self.client_options.local_port,
+        };
+        let protocol = match self.client_options.scheme {
+            HttpScheme::Http => ConnectMethod::HTTP,
+            HttpScheme::Https => ConnectMethod::HTTPS,
         };
 
         // Resolve the destination host to IPv4 and IPv6 addresses.
-        let host_records = HostRecord::new(&self.dst_ip, self.dst_port).await;
+        let host_records = HostRecord::new(&self.client_options.remote_host, self.client_options.remote_port).await;
         let hosts = vec![host_records.clone()];
         let resolved_hosts = resolve_host(hosts).await;
 
@@ -118,7 +94,11 @@ impl HttpClient {
         let mut count: u16 = 0;
         let mut send_count: u16 = 0;
 
-        let ping_header = ping_header_msg(&self.dst_ip, self.dst_port, self.ping_options.method);
+        let ping_header = ping_header_msg(
+            &self.client_options.remote_host,
+            self.client_options.remote_port,
+            protocol,
+        );
         println!("{ping_header}");
 
         // This is a signal handler that listens for a Ctrl-C signal.
@@ -145,7 +125,14 @@ impl HttpClient {
                 .map(|host_record| {
                     async move {
                         //
-                        process_host(src_ip_port, host_record, self.ping_options, self.ip_options).await
+                        process_host(
+                            src_ip_port,
+                            host_record,
+                            self.client_options.clone(),
+                            self.ping_options,
+                            self.ip_options,
+                        )
+                        .await
                     }
                 })
                 .buffer_unordered(BUFFER_SIZE)
@@ -175,14 +162,18 @@ impl HttpClient {
         for (_, addrs) in results_map {
             for (addr, latencies) in addrs {
                 let client_summary = ClientSummary { send_count, latencies };
-                let summary_msg = client_summary_result(&addr, self.ping_options.method, client_summary);
+                let summary_msg = client_summary_result(&addr, protocol, client_summary);
                 client_results.push(summary_msg)
             }
         }
         client_results.sort_by_key(|x| x.destination.to_owned());
 
-        let summary_table =
-            client_summary_table_msg(&self.dst_ip, self.dst_port, self.ping_options.method, &client_results);
+        let summary_table = client_summary_table_msg(
+            &self.client_options.remote_host,
+            self.client_options.remote_port,
+            protocol,
+            &client_results,
+        );
         println!("{}", summary_table);
 
         Ok(())
@@ -192,6 +183,7 @@ impl HttpClient {
 async fn process_host(
     src_ip_port: IpPort,
     host_record: HostRecord,
+    client_options: HttpClientOptions,
     ping_options: PingOptions,
     ip_options: IpOptions,
 ) -> HostResults {
@@ -202,18 +194,30 @@ async fn process_host(
         IpProtocol::V4 => host_record_clone.ipv4_sockets,
         IpProtocol::V6 => host_record_clone.ipv6_sockets,
     };
-
+    let protocol = match client_options.scheme {
+        HttpScheme::Http => ConnectMethod::HTTP,
+        HttpScheme::Https => ConnectMethod::HTTPS,
+    };
     let results: Vec<ConnectRecord> = futures::stream::iter(sockets)
         .map(|dst_socket| {
             {
                 let host_record = host_record.clone();
+                let client_options = client_options.clone();
                 async move {
                     //
-                    match connect_host(host_record, src_ip_port, dst_socket, ping_options).await {
+                    match connect_host(
+                        host_record,
+                        src_ip_port,
+                        dst_socket,
+                        client_options.clone(),
+                        ping_options,
+                    )
+                    .await
+                    {
                         Ok(record) => record,
                         Err(e) => ConnectRecord {
                             result: ConnectResult::Unknown,
-                            protocol: ping_options.method,
+                            protocol: protocol,
                             source: src_ip_port.ipv4.to_string(),
                             destination: dst_socket.to_string(),
                             time: -1.0,
@@ -238,6 +242,7 @@ async fn connect_host(
     host_record: HostRecord,
     src: IpPort,
     dst_socket: SocketAddr,
+    client_options: HttpClientOptions,
     ping_options: PingOptions,
 ) -> Result<ConnectRecord> {
     let (bind_addr, src_socket) = match &dst_socket.is_ipv4() {
@@ -254,11 +259,16 @@ async fn connect_host(
         }
     };
 
+    let protocol = match client_options.scheme {
+        HttpScheme::Http => ConnectMethod::HTTP,
+        HttpScheme::Https => ConnectMethod::HTTPS,
+    };
+
     // If the source socket is None, we could not bind to the socket.
     if src_socket.is_none() {
         return Ok(ConnectRecord {
             result: ConnectResult::BindError,
-            protocol: ping_options.method,
+            protocol,
             source: bind_addr.to_string(),
             destination: dst_socket.to_string(),
             time: -1.0,
@@ -267,28 +277,33 @@ async fn connect_host(
         });
     }
 
-    // println!("{}", dst_socket);
-    let http_client = Client::builder()
-        .danger_accept_invalid_certs(true)
-        .danger_accept_invalid_hostnames(true)
-        .tls_built_in_root_certs(true) // Use system root certificates
-        .use_rustls_tls() // Use rustls instead of native-tls
-        .tls_sni(true)
-        .redirect(reqwest::redirect::Policy::limited(10))
-        .resolve(&host_record.host, dst_socket) // Bypass DNS resolution as we have already resoloved the IP
-        .timeout(Duration::from_millis(ping_options.timeout as u64))
-        .local_address(bind_addr.ip())
-        .build()?;
-
-    let protocol = match ping_options.method {
-        ConnectMethod::HTTP => "http",
-        ConnectMethod::HTTPS => "https", // TODO: Update to HTTPS
-        _ => bail!("UNKOWN HTTP PROTOCOL TYPE"),
+    let http_client = match client_options.scheme {
+        HttpScheme::Http => {
+            Client::builder()
+                .redirect(reqwest::redirect::Policy::limited(10))
+                .resolve(&host_record.host, dst_socket) // Bypass DNS resolution as we have already resolved the IP
+                .timeout(Duration::from_millis(ping_options.timeout as u64))
+                .local_address(bind_addr.ip())
+                .build()?
+        }
+        HttpScheme::Https => {
+            Client::builder()
+                .danger_accept_invalid_certs(true)
+                .danger_accept_invalid_hostnames(true)
+                .tls_built_in_root_certs(true) // Use system root certificates
+                .use_rustls_tls() // Use rustls instead of native-tls
+                .tls_sni(true)
+                .redirect(reqwest::redirect::Policy::limited(10))
+                .resolve(&host_record.host, dst_socket) // Bypass DNS resolution as we have already resoloved the IP
+                .timeout(Duration::from_millis(ping_options.timeout as u64))
+                .local_address(bind_addr.ip())
+                .build()?
+        }
     };
 
     let mut conn_record = ConnectRecord {
         result: ConnectResult::Unknown,
-        protocol: ping_options.method,
+        protocol,
         source: bind_addr.ip().to_string(),
         destination: dst_socket.to_string(),
         time: -1.0,
@@ -299,7 +314,7 @@ async fn connect_host(
     // record timestamp before connection
     let pre_conn_timestamp = time_now_us();
 
-    let url = format!("{protocol}://{}", host_record.host);
+    let url = format!("{}://{}", client_options.scheme, host_record.host);
 
     match http_client.get(url.clone()).header("Connection", "close").send().await {
         Ok(response) => {

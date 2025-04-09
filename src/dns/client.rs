@@ -35,7 +35,7 @@ pub struct DnsClientOptions {
 }
 
 pub struct DnsClient {
-    pub dns_client_options: DnsClientOptions,
+    pub client_options: DnsClientOptions,
     pub logging_options: LoggingOptions,
     pub ping_options: PingOptions,
     pub ip_options: IpOptions,
@@ -44,16 +44,16 @@ pub struct DnsClient {
 impl DnsClient {
     pub async fn connect(&self) -> Result<()> {
         let local_ip_port = IpPort {
-            ipv4: self.dns_client_options.local_ipv4,
-            ipv6: self.dns_client_options.local_ipv6,
-            port: self.dns_client_options.local_port,
+            ipv4: self.client_options.local_ipv4,
+            ipv6: self.client_options.local_ipv6,
+            port: self.client_options.local_port,
         };
 
         // Resolve the destination host to IPv4 and IPv6 addresses.
 
         let mut host_records = vec![];
-        for host in self.dns_client_options.remote_host.iter() {
-            host_records.push(HostRecord::new(&host, self.dns_client_options.remote_port).await);
+        for host in self.client_options.remote_host.iter() {
+            host_records.push(HostRecord::new(&host, self.client_options.remote_port).await);
         }
 
         let resolved_hosts = resolve_host(host_records).await;
@@ -97,8 +97,8 @@ impl DnsClient {
         let mut send_count: u16 = 0;
 
         let ping_header = ping_header_msg(
-            &self.dns_client_options.remote_host[0],
-            self.dns_client_options.remote_port,
+            &self.client_options.remote_host[0],
+            self.client_options.remote_port,
             self.ping_options.method,
         );
         println!("{ping_header}");
@@ -125,12 +125,12 @@ impl DnsClient {
 
             let host_results: Vec<HostResults> = futures::stream::iter(resolved_hosts.clone())
                 .map(|host_record| {
-                    let dns_client_options = self.dns_client_options.clone();
+                    let client_options = self.client_options.clone();
                     async move {
                         //
                         process_host(
                             local_ip_port,
-                            dns_client_options,
+                            client_options,
                             host_record,
                             self.ping_options,
                             self.ip_options,
@@ -172,8 +172,8 @@ impl DnsClient {
         client_results.sort_by_key(|x| x.destination.to_owned());
 
         let summary_table = client_summary_table_msg(
-            &self.dns_client_options.remote_host[0],
-            self.dns_client_options.remote_port,
+            &self.client_options.remote_host[0],
+            self.client_options.remote_port,
             self.ping_options.method,
             &client_results,
         );
@@ -185,7 +185,7 @@ impl DnsClient {
 
 async fn process_host(
     src_ip_port: IpPort,
-    dns_client_options: DnsClientOptions,
+    client_options: DnsClientOptions,
     host_record: HostRecord,
     ping_options: PingOptions,
     ip_options: IpOptions,
@@ -201,10 +201,10 @@ async fn process_host(
     let results: Vec<ConnectRecord> = futures::stream::iter(sockets)
         .map(|dst_socket| {
             {
-                let dns_client_options = dns_client_options.clone();
+                let client_options = client_options.clone();
                 async move {
                     //
-                    match connect_host(dns_client_options, src_ip_port, dst_socket, ping_options).await {
+                    match connect_host(client_options, src_ip_port, dst_socket, ping_options).await {
                         Ok(record) => record,
                         Err(e) => ConnectRecord {
                             result: ConnectResult::Unknown,
@@ -231,7 +231,7 @@ async fn process_host(
 
 async fn connect_host(
     // host_record: HostRecord,
-    dns_client_options: DnsClientOptions,
+    client_options: DnsClientOptions,
     local: IpPort,
     dst_socket: SocketAddr,
     ping_options: PingOptions,
@@ -263,7 +263,7 @@ async fn connect_host(
         });
     }
 
-    let transport_protocol = match dns_client_options.transport {
+    let transport_protocol = match client_options.transport {
         Transport::Tcp => Protocol::Tcp,
         Transport::Udp => Protocol::Udp,
     };
@@ -297,7 +297,7 @@ async fn connect_host(
     // record timestamp before connection
     let pre_conn_timestamp = time_now_us();
 
-    match resolver.lookup_ip(dns_client_options.domain).await {
+    match resolver.lookup_ip(client_options.domain).await {
         Ok(_) => {
             let post_conn_timestamp = time_now_us();
             let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);

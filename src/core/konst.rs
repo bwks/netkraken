@@ -18,3 +18,5 @@ pub const PING_NK_PEER: bool = false;
 pub const CLI_HEADER_MSG: &str = "NetKraken - Cross platform network connectivity tester\n";
 pub const DNS_LOOKUP_DOMAIN: &str = "www.microsoft.com";
 pub const DNS_PORT: u16 = 53;
+pub const HTTP_PORT: u16 = 80;
+pub const HTTPS_PORT: u16 = 443;

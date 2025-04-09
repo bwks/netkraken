@@ -73,6 +73,21 @@ impl Display for ConnectMethod {
 }
 
 #[derive(Debug, Default, Clone, ValueEnum, PartialEq)]
+pub enum HttpScheme {
+    Http,
+    #[default]
+    Https,
+}
+impl std::fmt::Display for HttpScheme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HttpScheme::Http => write!(f, "http"),
+            HttpScheme::Https => write!(f, "https"),
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, ValueEnum, PartialEq)]
 pub enum Transport {
     Tcp,
     #[default]
