@@ -50,24 +50,24 @@ impl Display for ConnectResult {
 #[derive(ValueEnum, Copy, Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub enum ConnectMethod {
     #[default]
-    TCP,
-    UDP,
+    Tcp,
+    Udp,
 
-    DNS,
+    Dns,
     // ICMP,
-    HTTP,
-    HTTPS,
+    Http,
+    Https,
 }
 
 impl Display for ConnectMethod {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConnectMethod::TCP => write!(f, "tcp"),
-            ConnectMethod::UDP => write!(f, "udp"),
+            ConnectMethod::Tcp => write!(f, "tcp"),
+            ConnectMethod::Udp => write!(f, "udp"),
             // ConnectMethod::ICMP => write!(f, "icmp"),
-            ConnectMethod::DNS => write!(f, "dns"),
-            ConnectMethod::HTTP => write!(f, "http"),
-            ConnectMethod::HTTPS => write!(f, "https"),
+            ConnectMethod::Dns => write!(f, "dns"),
+            ConnectMethod::Http => write!(f, "http"),
+            ConnectMethod::Https => write!(f, "https"),
         }
     }
 }

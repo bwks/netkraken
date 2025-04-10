@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::{Args, Parser, Subcommand, ValueEnum};
+use clap::{Args, Parser, Subcommand};
 
 use crate::core::common::{
     ConnectMethod, HttpScheme, HttpVersion, IpOptions, IpProtocol, ListenOptions, LoggingOptions, PingOptions,
@@ -62,6 +62,7 @@ pub enum Command {
         #[clap(flatten)]
         shared_options: SharedOptions,
     },
+
     /// HTTP connection
     Http {
         /// Remote host
@@ -141,10 +142,6 @@ pub struct SharedOptions {
     #[clap(short, long, default_value_t = PING_TIMEOUT, display_order = 122)]
     pub timeout: u16,
 
-    /// Connection Method
-    #[clap(long, default_value_t = ConnectMethod::default(), display_order = 123)]
-    pub method: ConnectMethod,
-
     /// IP Protocol to use
     #[clap(short = 'I', long, default_value_t = IpProtocol::V4, display_order = 124)]
     pub ip_proto: IpProtocol,
@@ -204,7 +201,6 @@ impl Default for SharedOptions {
             repeat: PING_REPEAT,
             interval: PING_INTERVAL,
             timeout: PING_TIMEOUT,
-            method: ConnectMethod::default(),
             ip_proto: IpProtocol::V4,
             local_v4: BIND_ADDR_IPV4.to_owned(),
             local_v6: BIND_ADDR_IPV6.to_owned(),
@@ -292,11 +288,7 @@ impl Cli {
             } else {
                 config.ping_options.nk_peer
             },
-            method: if shared_options.method != ConnectMethod::default() {
-                shared_options.method
-            } else {
-                config.ping_options.method
-            },
+            method: ConnectMethod::default(),
         };
 
         let listen_options = ListenOptions {
@@ -352,15 +344,15 @@ impl Cli {
                 transport,
                 shared_options,
             } => {
-                ping_options.method = ConnectMethod::DNS;
-
                 let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
                 let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
                 let local_port = shared_options.local_port;
 
+                ping_options.method = ConnectMethod::Dns;
+
                 let dns_client_options = DnsClientOptions {
                     remote_host: remote_host.clone(),
-                    remote_port: remote_port,
+                    remote_port,
                     local_ipv4,
                     local_ipv6,
                     local_port,
@@ -384,6 +376,8 @@ impl Cli {
                 let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
                 let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
                 let local_port = shared_options.local_port;
+
+                ping_options.method = ConnectMethod::Http;
 
                 let http_client_options = HttpClientOptions {
                     remote_host,
@@ -412,6 +406,8 @@ impl Cli {
                 let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
                 let local_port = shared_options.local_port;
 
+                ping_options.method = ConnectMethod::Https;
+
                 let http_client_options = HttpClientOptions {
                     remote_host,
                     remote_port,
@@ -437,6 +433,8 @@ impl Cli {
                 let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
                 let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
                 let local_port = shared_options.local_port;
+
+                ping_options.method = ConnectMethod::Tcp;
 
                 let tcp_client_options = TcpClientOptions {
                     remote_host,
@@ -471,6 +469,8 @@ impl Cli {
                 let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
                 let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
                 let local_port = shared_options.local_port;
+
+                ping_options.method = ConnectMethod::Udp;
 
                 let udp_client_options = UdpClientOptions {
                     remote_host,

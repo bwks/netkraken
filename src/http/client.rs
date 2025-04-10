@@ -12,13 +12,12 @@ use tokio::time::Duration;
 
 use crate::core::common::{
     ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, HttpScheme,
-    HttpVersion, IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions, Transport,
+    HttpVersion, IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions,
 };
-use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE};
+use crate::core::konst::BUFFER_SIZE;
 use crate::util::dns::resolve_host;
 use crate::util::handler::{log_handler2, loop_handler};
 use crate::util::message::{client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg};
-use crate::util::parser::parse_ipaddr;
 use crate::util::result::{client_summary_result, get_results_map};
 use crate::util::socket::get_tcp_socket;
 use crate::util::time::{calc_connect_ms, time_now_us};
@@ -49,8 +48,8 @@ impl HttpClient {
             port: self.client_options.local_port,
         };
         let protocol = match self.client_options.scheme {
-            HttpScheme::Http => ConnectMethod::HTTP,
-            HttpScheme::Https => ConnectMethod::HTTPS,
+            HttpScheme::Http => ConnectMethod::Http,
+            HttpScheme::Https => ConnectMethod::Https,
         };
 
         // Resolve the destination host to IPv4 and IPv6 addresses.
@@ -196,8 +195,8 @@ async fn process_host(
         IpProtocol::V6 => host_record_clone.ipv6_sockets,
     };
     let protocol = match client_options.scheme {
-        HttpScheme::Http => ConnectMethod::HTTP,
-        HttpScheme::Https => ConnectMethod::HTTPS,
+        HttpScheme::Http => ConnectMethod::Http,
+        HttpScheme::Https => ConnectMethod::Https,
     };
     let results: Vec<ConnectRecord> = futures::stream::iter(sockets)
         .map(|dst_socket| {
@@ -261,9 +260,11 @@ async fn connect_host(
     };
 
     let protocol = match client_options.scheme {
-        HttpScheme::Http => ConnectMethod::HTTP,
-        HttpScheme::Https => ConnectMethod::HTTPS,
+        HttpScheme::Http => ConnectMethod::Http,
+        HttpScheme::Https => ConnectMethod::Https,
     };
+
+    let _version = client_options.version;
 
     // If the source socket is None, we could not bind to the socket.
     if src_socket.is_none() {
@@ -279,6 +280,7 @@ async fn connect_host(
     }
 
     let mut headers = HeaderMap::new();
+
     headers.insert("x-custom-header", "netkraken".parse().unwrap());
 
     let http_client = match client_options.scheme {

@@ -12,7 +12,7 @@ use crate::core::common::{
     ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions,
     IpPort, IpProtocol, LoggingOptions, PingOptions,
 };
-use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE, MAX_PACKET_SIZE, PING_MSG};
+use crate::core::konst::{BUFFER_SIZE, MAX_PACKET_SIZE, PING_MSG};
 use crate::util::dns::resolve_host;
 use crate::util::handler::{io_error_switch_handler, log_handler2, loop_handler};
 use crate::util::message::{client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg};
@@ -88,7 +88,7 @@ impl UdpClient {
         let ping_header = ping_header_msg(
             &self.client_options.remote_host,
             self.client_options.remote_port,
-            ConnectMethod::UDP,
+            ConnectMethod::Udp,
         );
         println!("{ping_header}");
 
@@ -146,7 +146,7 @@ impl UdpClient {
         for (_, addrs) in results_map {
             for (addr, latencies) in addrs {
                 let client_summary = ClientSummary { send_count, latencies };
-                let client_summary = client_summary_result(&addr, ConnectMethod::UDP, client_summary);
+                let client_summary = client_summary_result(&addr, ConnectMethod::Udp, client_summary);
                 client_results.push(client_summary)
             }
         }
@@ -155,7 +155,7 @@ impl UdpClient {
         let summary_table = client_summary_table_msg(
             &self.client_options.remote_host,
             self.client_options.remote_port,
-            ConnectMethod::UDP,
+            ConnectMethod::Udp,
             &client_results,
         );
         println!("{}", summary_table);
@@ -207,7 +207,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
     if src_socket.is_none() {
         return ConnectRecord {
             result: ConnectResult::BindError,
-            protocol: ConnectMethod::UDP,
+            protocol: ConnectMethod::Udp,
             source: bind_addr.to_string(),
             destination: dst_socket.to_string(),
             time: -1.0,
@@ -226,7 +226,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
 
     let mut conn_record = ConnectRecord {
         result: ConnectResult::Unknown,
-        protocol: ConnectMethod::UDP,
+        protocol: ConnectMethod::Udp,
         source: local_addr.to_owned(),
         destination: dst_socket.to_string(),
         time: -1.0,

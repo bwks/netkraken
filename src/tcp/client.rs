@@ -11,11 +11,10 @@ use crate::core::common::{
     ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions,
     IpPort, IpProtocol, LoggingOptions, PingOptions,
 };
-use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE};
+use crate::core::konst::BUFFER_SIZE;
 use crate::util::dns::resolve_host;
 use crate::util::handler::{io_error_switch_handler, log_handler2, loop_handler};
 use crate::util::message::{client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg};
-use crate::util::parser::parse_ipaddr;
 use crate::util::result::{client_summary_result, get_results_map};
 use crate::util::socket::get_tcp_socket;
 use crate::util::time::{calc_connect_ms, time_now_us};
@@ -90,7 +89,7 @@ impl TcpClient {
         let ping_header = ping_header_msg(
             &self.client_options.remote_host,
             self.client_options.remote_port,
-            ConnectMethod::TCP,
+            ConnectMethod::Tcp,
         );
         println!("{ping_header}");
 
@@ -148,7 +147,7 @@ impl TcpClient {
         for (_, addrs) in results_map {
             for (addr, latencies) in addrs {
                 let client_summary = ClientSummary { send_count, latencies };
-                let summary_msg = client_summary_result(&addr, ConnectMethod::TCP, client_summary);
+                let summary_msg = client_summary_result(&addr, ConnectMethod::Tcp, client_summary);
                 client_results.push(summary_msg)
             }
         }
@@ -157,7 +156,7 @@ impl TcpClient {
         let summary_table = client_summary_table_msg(
             &self.client_options.remote_host,
             self.client_options.remote_port,
-            ConnectMethod::TCP,
+            ConnectMethod::Tcp,
             &client_results,
         );
         println!("{}", summary_table);
@@ -215,7 +214,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
     if src_socket.is_none() {
         return ConnectRecord {
             result: ConnectResult::BindError,
-            protocol: ConnectMethod::TCP,
+            protocol: ConnectMethod::Tcp,
             source: bind_addr.to_string(),
             destination: dst_socket.to_string(),
             time: -1.0,
@@ -235,7 +234,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
 
     let mut conn_record = ConnectRecord {
         result: ConnectResult::Unknown,
-        protocol: ConnectMethod::TCP,
+        protocol: ConnectMethod::Tcp,
         source: local_addr,
         destination: dst_socket.to_string(),
         time: -1.0,

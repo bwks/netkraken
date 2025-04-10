@@ -26,7 +26,7 @@ impl TcpServer {
 
         let listener = TcpListener::bind(&bind_addr).await?;
 
-        let start_msg = server_start_msg(ConnectMethod::TCP, &listen_ip, &self.listen_port);
+        let start_msg = server_start_msg(ConnectMethod::Tcp, &listen_ip, &self.listen_port);
         println!("{}", start_msg);
 
         loop {
@@ -71,7 +71,7 @@ impl TcpServer {
 
                 let msg = server_conn_success_msg(
                     ConnectResult::Ping,
-                    ConnectMethod::TCP,
+                    ConnectMethod::Tcp,
                     &stream.peer_addr()?.to_string(),
                     &stream.local_addr()?.to_string(),
                     client_server_time,
