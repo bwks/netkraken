@@ -9,7 +9,6 @@ use serde_derive::{Deserialize, Serialize};
 use toml::from_str;
 
 use crate::core::common::{IpOptions, ListenOptions, LoggingOptions, PingOptions};
-use crate::core::konst::CONFIG_FILE;
 
 /// Configuration options for NetKraken
 #[derive(Deserialize, Debug, Default, Serialize)]
@@ -33,20 +32,23 @@ impl Config {
     }
 
     /// Generate a default config file
-    pub fn generate() -> Result<()> {
-        // If config file exists don't overwrite it.
-        if PathBuf::from(CONFIG_FILE).exists() {
-            println!("Config file `{CONFIG_FILE}` already exists in current directory.\n");
-            return Ok(());
+    pub fn generate(file: &str, force: bool) -> Result<()> {
+        let create = match PathBuf::from(file).exists() {
+            true => {
+                println!("Config file `{file}` already exists in current directory.\n");
+                force
+            }
+            false => true,
+        };
+        if create {
+            let config = Config::default();
+            let toml_config = toml::to_string(&config)?;
+
+            println!("Generating default config file `{file}` in current directory.\n");
+            let mut config_file = File::create(file)?;
+            config_file.write_all(toml_config.as_bytes())?;
+            println!("{toml_config}");
         }
-
-        let config = Config::default();
-        let toml_config = toml::to_string(&config)?;
-
-        println!("Generating config file `{CONFIG_FILE}` in current directory.\n");
-        let mut config_file = File::create(CONFIG_FILE)?;
-        config_file.write_all(toml_config.as_bytes())?;
-        println!("{toml_config}");
 
         Ok(())
     }

@@ -207,7 +207,7 @@ mod tests {
 
     #[test]
     fn ping_header_msg_is_expected() {
-        let msg = ping_header_msg(&"198.51.100.1".to_owned(), 443, ConnectMethod::TCP);
+        let msg = ping_header_msg(&"198.51.100.1".to_owned(), 443, ConnectMethod::Tcp);
 
         assert_eq!(msg, "Connecting to 198.51.100.1:443 via TCP");
     }
@@ -224,7 +224,7 @@ mod tests {
     fn server_start_msg_is_expected() {
         let listen_ip: IpAddr = "127.0.0.1".parse::<IpAddr>().unwrap();
 
-        let msg = server_start_msg(ConnectMethod::TCP, &listen_ip, &42069);
+        let msg = server_start_msg(ConnectMethod::Tcp, &listen_ip, &42069);
 
         assert_eq!(
             msg,
@@ -236,7 +236,7 @@ mod tests {
     fn client_summary_table_msg_is_expected() {
         let client_results = ClientResult {
             destination: "198.51.100.1".to_owned(),
-            protocol: ConnectMethod::TCP,
+            protocol: ConnectMethod::Tcp,
             sent: 4,
             received: 4,
             lost: 0,
@@ -249,7 +249,7 @@ mod tests {
         let summary_table = client_summary_table_msg(
             &"stuff.things".to_string(),
             443,
-            ConnectMethod::TCP,
+            ConnectMethod::Tcp,
             &vec![client_results],
         );
 
@@ -269,7 +269,7 @@ mod tests {
     fn server_conn_success_msg_with_time_is_expected() {
         let msg = server_conn_success_msg(
             ConnectResult::Ping,
-            ConnectMethod::TCP,
+            ConnectMethod::Tcp,
             &"127.0.0.1:13337".to_string(),
             &"127.0.0.1:8080".to_string(),
             123.0,
@@ -285,7 +285,7 @@ mod tests {
     fn server_conn_success_msg_without_time_is_expected() {
         let msg = server_conn_success_msg(
             ConnectResult::Ping,
-            ConnectMethod::TCP,
+            ConnectMethod::Tcp,
             &"127.0.0.1:13337".to_string(),
             &"127.0.0.1:8080".to_string(),
             0.0,

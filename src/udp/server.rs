@@ -29,7 +29,7 @@ impl UdpServer {
         let writer = reader.clone();
         let (tx_chan, mut rx_chan) = mpsc::channel::<(Vec<u8>, SocketAddr)>(1);
 
-        let start_msg = server_start_msg(ConnectMethod::UDP, &listen_ip, &self.listen_port);
+        let start_msg = server_start_msg(ConnectMethod::Udp, &listen_ip, &self.listen_port);
         println!("{}", start_msg);
 
         tokio::spawn(async move {
@@ -88,7 +88,7 @@ impl UdpServer {
 
             let msg = server_conn_success_msg(
                 ConnectResult::Ping,
-                ConnectMethod::UDP,
+                ConnectMethod::Udp,
                 peer_addr,
                 local_addr,
                 client_server_time,

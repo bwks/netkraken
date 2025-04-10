@@ -1,18 +1,20 @@
+use hickory_resolver::config::{NameServerConfig, ResolverConfig};
+use hickory_resolver::name_server::TokioConnectionProvider;
+use hickory_resolver::proto::xfer::Protocol;
+use hickory_resolver::proto::ProtoErrorKind;
+use hickory_resolver::{ResolveErrorKind, Resolver};
+
 use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use anyhow::{bail, Result};
 use futures::StreamExt;
-use hyper_util::client::legacy::connect::HttpInfo;
-use reqwest::header::HeaderMap;
-use reqwest::Client;
 use tokio::signal;
-use tokio::time::Duration;
 
 use crate::core::common::{
-    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, HttpScheme,
-    HttpVersion, IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions,
+    ClientResult, ClientSummary, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions, IpPort, IpProtocol,
+    LoggingOptions, PingOptions, Transport,
 };
 use crate::core::konst::BUFFER_SIZE;
 use crate::util::dns::resolve_host;
@@ -23,31 +25,30 @@ use crate::util::socket::get_tcp_socket;
 use crate::util::time::{calc_connect_ms, time_now_us};
 
 #[derive(Debug, Clone)]
-pub struct HttpClientOptions {
+pub struct DnsClientOptions {
     pub remote_host: String,
     pub remote_port: u16,
     pub local_ipv4: IpAddr,
     pub local_ipv6: IpAddr,
     pub local_port: u16,
-    pub scheme: HttpScheme,
-    pub version: HttpVersion,
+    pub transport: Transport,
+    pub domain: String,
 }
 
-#[derive(Debug)]
-pub struct HttpClient {
-    pub client_options: HttpClientOptions,
+pub struct DnsClient {
+    pub client_options: DnsClientOptions,
     pub logging_options: LoggingOptions,
     pub ping_options: PingOptions,
     pub ip_options: IpOptions,
 }
-impl HttpClient {
+
+impl DnsClient {
     pub async fn connect(&self) -> Result<()> {
-        let src_ip_port = IpPort {
+        let local_ip_port = IpPort {
             ipv4: self.client_options.local_ipv4,
             ipv6: self.client_options.local_ipv6,
             port: self.client_options.local_port,
         };
-        let protocol = get_connect_method(&self.client_options.scheme);
 
         // Resolve the destination host to IPv4 and IPv6 addresses.
         let host_records = HostRecord::new(&self.client_options.remote_host, self.client_options.remote_port).await;
@@ -94,7 +95,7 @@ impl HttpClient {
         let ping_header = ping_header_msg(
             &self.client_options.remote_host,
             self.client_options.remote_port,
-            protocol,
+            self.ping_options.method,
         );
         println!("{ping_header}");
 
@@ -120,12 +121,13 @@ impl HttpClient {
 
             let host_results: Vec<HostResults> = futures::stream::iter(resolved_hosts.clone())
                 .map(|host_record| {
+                    let client_options = self.client_options.clone();
                     async move {
                         //
                         process_host(
-                            src_ip_port,
+                            local_ip_port,
+                            client_options,
                             host_record,
-                            self.client_options.clone(),
                             self.ping_options,
                             self.ip_options,
                         )
@@ -159,7 +161,7 @@ impl HttpClient {
         for (_, addrs) in results_map {
             for (addr, latencies) in addrs {
                 let client_summary = ClientSummary { send_count, latencies };
-                let summary_msg = client_summary_result(&addr, protocol, client_summary);
+                let summary_msg = client_summary_result(&addr, self.ping_options.method, client_summary);
                 client_results.push(summary_msg)
             }
         }
@@ -168,7 +170,7 @@ impl HttpClient {
         let summary_table = client_summary_table_msg(
             &self.client_options.remote_host,
             self.client_options.remote_port,
-            protocol,
+            self.ping_options.method,
             &client_results,
         );
         println!("{}", summary_table);
@@ -179,8 +181,8 @@ impl HttpClient {
 
 async fn process_host(
     src_ip_port: IpPort,
+    client_options: DnsClientOptions,
     host_record: HostRecord,
-    client_options: HttpClientOptions,
     ping_options: PingOptions,
     ip_options: IpOptions,
 ) -> HostResults {
@@ -191,26 +193,18 @@ async fn process_host(
         IpProtocol::V4 => host_record_clone.ipv4_sockets,
         IpProtocol::V6 => host_record_clone.ipv6_sockets,
     };
+
     let results: Vec<ConnectRecord> = futures::stream::iter(sockets)
         .map(|dst_socket| {
             {
-                let host_record = host_record.clone();
                 let client_options = client_options.clone();
                 async move {
                     //
-                    match connect_host(
-                        host_record,
-                        src_ip_port,
-                        dst_socket,
-                        client_options.clone(),
-                        ping_options,
-                    )
-                    .await
-                    {
+                    match connect_host(client_options, src_ip_port, dst_socket, ping_options).await {
                         Ok(record) => record,
                         Err(e) => ConnectRecord {
                             result: ConnectResult::Unknown,
-                            protocol: get_connect_method(&client_options.scheme),
+                            protocol: ping_options.method,
                             source: src_ip_port.ipv4.to_string(),
                             destination: dst_socket.to_string(),
                             time: -1.0,
@@ -232,35 +226,30 @@ async fn process_host(
 }
 
 async fn connect_host(
-    host_record: HostRecord,
-    src: IpPort,
+    client_options: DnsClientOptions,
+    local: IpPort,
     dst_socket: SocketAddr,
-    client_options: HttpClientOptions,
     ping_options: PingOptions,
 ) -> Result<ConnectRecord> {
-    let (bind_addr, src_socket) = match &dst_socket.is_ipv4() {
+    let (bind_addr, local_socket) = match &dst_socket.is_ipv4() {
         // Bind the source socket to the same IP Version as the destination socket.
         true => {
-            let bind_ipv4_addr = SocketAddr::new(src.ipv4, src.port);
+            let bind_ipv4_addr = SocketAddr::new(local.ipv4, local.port);
             let socket = get_tcp_socket(bind_ipv4_addr).ok();
             (bind_ipv4_addr, socket)
         }
         false => {
-            let bind_ipv6_addr = SocketAddr::new(src.ipv6, src.port);
+            let bind_ipv6_addr = SocketAddr::new(local.ipv6, local.port);
             let socket = get_tcp_socket(bind_ipv6_addr).ok();
             (bind_ipv6_addr, socket)
         }
     };
 
-    let protocol = get_connect_method(&client_options.scheme);
-
-    let _version = client_options.version;
-
     // If the source socket is None, we could not bind to the socket.
-    if src_socket.is_none() {
+    if local_socket.is_none() {
         return Ok(ConnectRecord {
             result: ConnectResult::BindError,
-            protocol,
+            protocol: ping_options.method,
             source: bind_addr.to_string(),
             destination: dst_socket.to_string(),
             time: -1.0,
@@ -269,40 +258,32 @@ async fn connect_host(
         });
     }
 
-    let mut headers = HeaderMap::new();
-    headers.insert("x-custom-header", "netkraken".parse().unwrap());
-    headers.insert("connection", "close".parse().unwrap());
-
-    let http_client = match client_options.scheme {
-        HttpScheme::Http => {
-            Client::builder()
-                .default_headers(headers)
-                .redirect(reqwest::redirect::Policy::limited(10))
-                .resolve(&host_record.host, dst_socket) // Bypass DNS resolution as we have already resolved the IP
-                .timeout(Duration::from_millis(ping_options.timeout as u64))
-                .local_address(bind_addr.ip())
-                .build()?
-        }
-        HttpScheme::Https => {
-            Client::builder()
-                .default_headers(headers)
-                .danger_accept_invalid_certs(true)
-                .danger_accept_invalid_hostnames(true)
-                .tls_built_in_root_certs(true) // Use system root certificates
-                .use_rustls_tls() // Use rustls instead of native-tls
-                .tls_sni(true)
-                .redirect(reqwest::redirect::Policy::limited(10))
-                .resolve(&host_record.host, dst_socket) // Bypass DNS resolution as we have already resoloved the IP
-                .timeout(Duration::from_millis(ping_options.timeout as u64))
-                .local_address(bind_addr.ip())
-                .build()?
-        }
+    // Map to symbol used by Hickory resolver.
+    let transport_protocol = match client_options.transport {
+        Transport::Tcp => Protocol::Tcp,
+        Transport::Udp => Protocol::Udp,
     };
+
+    // Configure resolver for this server
+    let ns_config = NameServerConfig {
+        socket_addr: dst_socket,
+        protocol: transport_protocol,
+        http_endpoint: None,
+        tls_dns_name: None,
+        trust_negative_responses: false,
+        bind_addr: Some(bind_addr),
+    };
+
+    let mut config = ResolverConfig::new();
+    config.add_name_server(ns_config);
+
+    // Build resolver with our config and options
+    let resolver = Resolver::builder_with_config(config, TokioConnectionProvider::default()).build();
 
     let mut conn_record = ConnectRecord {
         result: ConnectResult::Unknown,
-        protocol,
-        source: bind_addr.ip().to_string(),
+        protocol: ping_options.method,
+        source: bind_addr.to_string(),
         destination: dst_socket.to_string(),
         time: -1.0,
         success: false,
@@ -312,50 +293,48 @@ async fn connect_host(
     // record timestamp before connection
     let pre_conn_timestamp = time_now_us();
 
-    let url = format!("{}://{}", client_options.scheme, host_record.host);
-
-    match http_client.get(url.clone()).send().await {
-        Ok(response) => {
-            let post_conn_timestamp = time_now_us();
-            let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
-            conn_record.success = true;
-            conn_record.time = connection_time;
-            conn_record.result = ConnectResult::Pong;
-
-            let local_ip = response.extensions().get::<HttpInfo>().map(|info| info.local_addr());
-            if local_ip.is_some() {
-                // This will always be some
-                conn_record.source = local_ip.unwrap().to_string()
-            }
+    // `lookup_ip` returns an error if the dns record is not found.
+    // `server_connected` is used to reduce repeating successful
+    // params in `conn_record` in the error case.
+    let mut server_connected = false;
+    match resolver.lookup_ip(client_options.domain).await {
+        Ok(_) => {
+            server_connected = true;
         }
         Err(e) => {
-            if e.is_connect() && e.to_string().contains("https") {
-                // println!("REDIRECTED TO HTTPS");
-                let post_conn_timestamp = time_now_us();
-                let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
-                conn_record.success = true;
-                conn_record.time = connection_time;
-                conn_record.result = ConnectResult::Pong;
-            } else {
-                conn_record.error_msg = Some(e.to_string());
-                if e.is_timeout() {
-                    conn_record.result = ConnectResult::Timeout;
-                } else if e.is_connect() {
-                    conn_record.result = ConnectResult::ConnectError;
-                } else {
-                    conn_record.result = ConnectResult::Error;
+            // If we get these errors, we get a reply from the server,
+            // which is what we are testing.
+            // Check specific error kinds from hickory resolver
+            if e.is_no_records_found() || e.is_nx_domain() {
+                server_connected = true;
+            }
+            match e.kind() {
+                ResolveErrorKind::Proto(proto_err) => {
+                    // Check the specific proto error kind
+                    match proto_err.kind() {
+                        ProtoErrorKind::NoRecordsFound { .. } => {
+                            server_connected = true;
+                        }
+                        _ => {
+                            conn_record.error_msg = Some(e.to_string());
+                        }
+                    }
+                }
+                _ => {
+                    conn_record.error_msg = Some(e.to_string());
                 }
             }
         }
     };
+    if server_connected {
+        let post_conn_timestamp = time_now_us();
+        let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
+        conn_record.success = true;
+        conn_record.time = connection_time;
+        conn_record.result = ConnectResult::Pong;
+    } else {
+        conn_record.result = ConnectResult::Error;
+    }
 
     Ok(conn_record)
-}
-
-// Map the `ConnectMethod` from the `HttpScheme`
-fn get_connect_method(scheme: &HttpScheme) -> ConnectMethod {
-    match scheme {
-        HttpScheme::Http => ConnectMethod::Http,
-        HttpScheme::Https => ConnectMethod::Https,
-    }
 }

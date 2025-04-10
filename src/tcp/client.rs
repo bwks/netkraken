@@ -11,73 +11,42 @@ use crate::core::common::{
     ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions,
     IpPort, IpProtocol, LoggingOptions, PingOptions,
 };
-use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE};
+use crate::core::konst::BUFFER_SIZE;
 use crate::util::dns::resolve_host;
 use crate::util::handler::{io_error_switch_handler, log_handler2, loop_handler};
 use crate::util::message::{client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg};
-use crate::util::parser::parse_ipaddr;
 use crate::util::result::{client_summary_result, get_results_map};
 use crate::util::socket::get_tcp_socket;
 use crate::util::time::{calc_connect_ms, time_now_us};
 
+#[derive(Debug, Clone)]
+pub struct TcpClientOptions {
+    pub remote_host: String,
+    pub remote_port: u16,
+    pub local_ipv4: IpAddr,
+    pub local_ipv6: IpAddr,
+    pub local_port: u16,
+}
+
 #[derive(Debug)]
 pub struct TcpClient {
-    pub dst_ip: String,
-    pub dst_port: u16,
-    pub src_ipv4: Option<IpAddr>,
-    pub src_ipv6: Option<IpAddr>,
-    pub src_port: u16,
+    pub client_options: TcpClientOptions,
     pub logging_options: LoggingOptions,
     pub ping_options: PingOptions,
     pub ip_options: IpOptions,
 }
 
 impl TcpClient {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        dst_ip: String,
-        dst_port: u16,
-        src_ipv4: Option<String>,
-        src_ipv6: Option<String>,
-        src_port: Option<u16>,
-        logging_options: LoggingOptions,
-        ping_options: PingOptions,
-        ip_options: IpOptions,
-    ) -> TcpClient {
-        let src_ipv4 = match src_ipv4 {
-            Some(x) => parse_ipaddr(&x).ok(),
-            None => parse_ipaddr(BIND_ADDR_IPV4).ok(),
-        };
-
-        let src_ipv6 = match src_ipv6 {
-            Some(x) => parse_ipaddr(&x).ok(),
-            None => parse_ipaddr(BIND_ADDR_IPV6).ok(),
-        };
-
-        let src_port = src_port.unwrap_or(BIND_PORT);
-
-        TcpClient {
-            dst_ip,
-            dst_port,
-            src_ipv4,
-            src_ipv6,
-            src_port,
-            logging_options,
-            ping_options,
-            ip_options,
-        }
-    }
-
     pub async fn connect(&self) -> Result<()> {
         let src_ip_port = IpPort {
             // These should never be None at this point as they are set in the TcpClient::new() constructor.
-            ipv4: self.src_ipv4.unwrap(),
-            ipv6: self.src_ipv6.unwrap(),
-            port: self.src_port,
+            ipv4: self.client_options.local_ipv4,
+            ipv6: self.client_options.local_ipv6,
+            port: self.client_options.local_port,
         };
 
         // Resolve the destination host to IPv4 and IPv6 addresses.
-        let host_records = HostRecord::new(&self.dst_ip, self.dst_port).await;
+        let host_records = HostRecord::new(&self.client_options.remote_host, self.client_options.remote_port).await;
         let hosts = vec![host_records.clone()];
         let resolved_hosts = resolve_host(hosts).await;
 
@@ -117,7 +86,11 @@ impl TcpClient {
         let mut count: u16 = 0;
         let mut send_count: u16 = 0;
 
-        let ping_header = ping_header_msg(&self.dst_ip, self.dst_port, ConnectMethod::TCP);
+        let ping_header = ping_header_msg(
+            &self.client_options.remote_host,
+            self.client_options.remote_port,
+            ConnectMethod::Tcp,
+        );
         println!("{ping_header}");
 
         // This is a signal handler that listens for a Ctrl-C signal.
@@ -174,13 +147,18 @@ impl TcpClient {
         for (_, addrs) in results_map {
             for (addr, latencies) in addrs {
                 let client_summary = ClientSummary { send_count, latencies };
-                let summary_msg = client_summary_result(&addr, ConnectMethod::TCP, client_summary);
+                let summary_msg = client_summary_result(&addr, ConnectMethod::Tcp, client_summary);
                 client_results.push(summary_msg)
             }
         }
         client_results.sort_by_key(|x| x.destination.to_owned());
 
-        let summary_table = client_summary_table_msg(&self.dst_ip, self.dst_port, ConnectMethod::TCP, &client_results);
+        let summary_table = client_summary_table_msg(
+            &self.client_options.remote_host,
+            self.client_options.remote_port,
+            ConnectMethod::Tcp,
+            &client_results,
+        );
         println!("{}", summary_table);
 
         Ok(())
@@ -236,7 +214,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
     if src_socket.is_none() {
         return ConnectRecord {
             result: ConnectResult::BindError,
-            protocol: ConnectMethod::TCP,
+            protocol: ConnectMethod::Tcp,
             source: bind_addr.to_string(),
             destination: dst_socket.to_string(),
             time: -1.0,
@@ -256,7 +234,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
 
     let mut conn_record = ConnectRecord {
         result: ConnectResult::Unknown,
-        protocol: ConnectMethod::TCP,
+        protocol: ConnectMethod::Tcp,
         source: local_addr,
         destination: dst_socket.to_string(),
         time: -1.0,

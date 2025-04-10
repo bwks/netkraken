@@ -50,21 +50,75 @@ impl Display for ConnectResult {
 #[derive(ValueEnum, Copy, Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 pub enum ConnectMethod {
     #[default]
-    TCP,
-    UDP,
+    Tcp,
+    Udp,
+
+    Dns,
     // ICMP,
-    HTTP,
-    HTTPS,
+    Http,
+    Https,
 }
 
 impl Display for ConnectMethod {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConnectMethod::TCP => write!(f, "tcp"),
-            ConnectMethod::UDP => write!(f, "udp"),
+            ConnectMethod::Tcp => write!(f, "tcp"),
+            ConnectMethod::Udp => write!(f, "udp"),
             // ConnectMethod::ICMP => write!(f, "icmp"),
-            ConnectMethod::HTTP => write!(f, "http"),
-            ConnectMethod::HTTPS => write!(f, "https"),
+            ConnectMethod::Dns => write!(f, "dns"),
+            ConnectMethod::Http => write!(f, "http"),
+            ConnectMethod::Https => write!(f, "https"),
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, ValueEnum, PartialEq)]
+pub enum HttpScheme {
+    Http,
+    #[default]
+    Https,
+}
+impl std::fmt::Display for HttpScheme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HttpScheme::Http => write!(f, "http"),
+            HttpScheme::Https => write!(f, "https"),
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, ValueEnum, PartialEq, Deserialize)]
+pub enum HttpVersion {
+    #[default]
+    #[value(name = "1")]
+    V1,
+    #[value(name = "2")]
+    V2,
+    #[value(name = "3")]
+    V3,
+}
+impl std::fmt::Display for HttpVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HttpVersion::V1 => write!(f, "1"),
+            HttpVersion::V2 => write!(f, "2"),
+            HttpVersion::V3 => write!(f, "3"),
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, ValueEnum, PartialEq)]
+pub enum Transport {
+    Tcp,
+    #[default]
+    Udp,
+}
+
+impl std::fmt::Display for Transport {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Transport::Tcp => write!(f, "tcp"),
+            Transport::Udp => write!(f, "udp"),
         }
     }
 }

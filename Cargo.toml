@@ -1,6 +1,6 @@
 [package]
 name = "netkraken"
-version = "0.1.16"
+version = "0.2.0"
 edition = "2021"
 
 [[bin]]
@@ -36,6 +36,9 @@ toml = "0.8.20"
 # HTTP Client
 hyper-util = "0.1.11"
 reqwest = { version = "0.12.15", features = ["json", "rustls-tls"] }
+
+# DNS Client
+hickory-resolver = "0.25.1"
 
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
