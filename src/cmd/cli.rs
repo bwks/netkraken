@@ -9,7 +9,7 @@ use crate::core::config::Config;
 use crate::core::konst::{
     BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CLI_HEADER_MSG, CONFIG_FILE, CURRENT_DIR, DNS_LOOKUP_DOMAIN, DNS_PORT,
     HTTPS_PORT, HTTP_PORT, LOGFILE_NAME, LOGGING_JSON, LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER,
-    PING_REPEAT, PING_TIMEOUT, TCP_PORT, UDP_PORT,
+    PING_REPEAT, PING_TIMEOUT,
 };
 use crate::dns::client::{DnsClient, DnsClientOptions};
 use crate::http::client::{HttpClient, HttpClientOptions};
@@ -35,6 +35,12 @@ pub enum ConfigCommand {
 
 #[derive(Debug, Subcommand, PartialEq)]
 pub enum Command {
+    /// Generate a NetKraken config
+    Config {
+        #[clap(subcommand)]
+        command: ConfigCommand,
+    },
+
     /// DNS connection
     Dns {
         /// Remote host(s). Seperate hosts with a space ' '. EG: 1.1.1.1 9.9.9.9
@@ -42,7 +48,7 @@ pub enum Command {
         remote_host: Vec<String>,
 
         /// Remote port
-        #[clap(short = 'p', long, default_value_t = DNS_PORT, display_order = 2)]
+        #[clap(short = 'P', long, default_value_t = DNS_PORT, display_order = 2)]
         remote_port: u16,
 
         /// Test DNS domain
@@ -63,7 +69,7 @@ pub enum Command {
         remote_host: String,
 
         /// Remote port
-        #[clap(short = 'p', long, default_value_t = HTTP_PORT, display_order = 2)]
+        #[clap(short = 'P', long, default_value_t = HTTP_PORT, display_order = 2)]
         remote_port: u16,
 
         /// HTTP Version
@@ -81,7 +87,7 @@ pub enum Command {
         remote_host: String,
 
         /// Remote port
-        #[clap(short = 'p', long, default_value_t = HTTPS_PORT, display_order = 2)]
+        #[clap(short = 'P', long, default_value_t = HTTPS_PORT, display_order = 2)]
         remote_port: u16,
 
         /// HTTP Version
@@ -99,7 +105,7 @@ pub enum Command {
         remote_host: String,
 
         /// Remote port
-        #[clap(short = 'p', long, display_order = 2)]
+        #[clap(short = 'P', long, display_order = 2)]
         remote_port: u16,
 
         #[clap(flatten)]
@@ -113,17 +119,11 @@ pub enum Command {
         remote_host: String,
 
         /// Remote port
-        #[clap(short = 'p', long, display_order = 2)]
+        #[clap(short = 'P', long, display_order = 2)]
         remote_port: u16,
 
         #[clap(flatten)]
         shared_options: SharedOptions,
-    },
-
-    /// Generate a NetKraken config
-    Config {
-        #[clap(subcommand)]
-        command: ConfigCommand,
     },
 }
 
@@ -151,23 +151,11 @@ pub struct SharedOptions {
 
     /// Source IPv4 Address
     #[clap(long, default_value = BIND_ADDR_IPV4, display_order = 125)]
-    pub src_v4: String,
-
-    /// Source IPv6 Address
-    #[clap(long, default_value = BIND_ADDR_IPV6, display_order = 126)]
-    pub src_v6: String,
-
-    /// Source IPv4 Address
-    #[clap(long, default_value = BIND_ADDR_IPV4, display_order = 125)]
     pub local_v4: String,
 
     /// Source IPv6 Address
     #[clap(long, default_value = BIND_ADDR_IPV6, display_order = 126)]
     pub local_v6: String,
-
-    /// Source port (0 detects random unused high port between 1024-65534)
-    #[clap(short = 'P', long, default_value_t = BIND_PORT, display_order = 127)]
-    pub src_port: u16,
 
     /// Source port (0 detects random unused high port between 1024-65534)
     #[clap(long, default_value_t = BIND_PORT, display_order = 127)]
@@ -218,11 +206,8 @@ impl Default for SharedOptions {
             timeout: PING_TIMEOUT,
             method: ConnectMethod::default(),
             ip_proto: IpProtocol::V4,
-            src_v4: BIND_ADDR_IPV4.to_owned(),
-            src_v6: BIND_ADDR_IPV6.to_owned(),
             local_v4: BIND_ADDR_IPV4.to_owned(),
             local_v6: BIND_ADDR_IPV6.to_owned(),
-            src_port: BIND_PORT,
             local_port: BIND_PORT,
             nk_peer: false,
             config: CONFIG_FILE.to_owned(),
@@ -259,16 +244,6 @@ impl Cli {
             Command::Dns { ref shared_options, .. } => shared_options.clone(),
             _ => SharedOptions::default(),
         };
-
-        // if let Command::Config { command } = &cli.command {
-        //     // Handle config command here
-        //     match command {
-        //         ConfigCommand::Create { file, force } => {
-        //             Config::generate(&file, *force)?;
-        //         }
-        //     }
-        //     return Ok(());
-        // }
 
         let config = match Config::load(&shared_options.config) {
             Ok(config) => {
@@ -351,11 +326,11 @@ impl Cli {
         // region:    ===== validators ===== //
 
         // validate source IP addresses
-        if shared_options.src_v4 != BIND_ADDR_IPV4 {
-            validate_local_ip(&shared_options.src_v4.parse()?)?;
+        if shared_options.local_v4 != BIND_ADDR_IPV4 {
+            validate_local_ip(&shared_options.local_v4.parse()?)?;
         }
-        if shared_options.src_v6 != BIND_ADDR_IPV6 {
-            validate_local_ip(&shared_options.src_v6.parse()?)?;
+        if shared_options.local_v6 != BIND_ADDR_IPV6 {
+            validate_local_ip(&shared_options.local_v6.parse()?)?;
         }
 
         // endregion: ===== validators ===== //
@@ -523,69 +498,6 @@ impl Cli {
                 }
             }
         }
-        // match cli.method {
-        //     ConnectMethod::DNS => {}
-        //     ConnectMethod::HTTP | ConnectMethod::HTTPS => {
-        //         let http_client = HttpClient::new(
-        //             host,
-        //             port,
-        //             Some(cli.src_v4),
-        //             Some(cli.src_v6),
-        //             Some(cli.src_port),
-        //             logging_options,
-        //             ping_options,
-        //             ip_options,
-        //         );
-        //         http_client.connect().await?;
-        //     }
-        //     // ConnectMethod::ICMP => println!("icmp not implemented"),
-        //     ConnectMethod::TCP => {
-        //         if cli.listen {
-        //             let tcp_server = TcpServer {
-        //                 listen_ip: host,
-        //                 listen_port: port,
-        //                 logging_options,
-        //                 listen_options,
-        //             };
-        //             tcp_server.listen().await?;
-        //         } else {
-        //             let tcp_client = TcpClient::new(
-        //                 host,
-        //                 port,
-        //                 Some(cli.src_v4),
-        //                 Some(cli.src_v6),
-        //                 Some(cli.src_port),
-        //                 logging_options,
-        //                 ping_options,
-        //                 ip_options,
-        //             );
-        //             tcp_client.connect().await?;
-        //         }
-        //     }
-        //     ConnectMethod::UDP => {
-        //         if cli.listen {
-        //             let udp_server = UdpServer {
-        //                 listen_ip: host,
-        //                 listen_port: port,
-        //                 logging_options,
-        //                 listen_options,
-        //             };
-        //             udp_server.listen().await?;
-        //         } else {
-        //             let udp_client = UdpClient::new(
-        //                 host,
-        //                 port,
-        //                 Some(cli.src_v4),
-        //                 Some(cli.src_v6),
-        //                 Some(cli.src_port),
-        //                 logging_options,
-        //                 ping_options,
-        //                 ip_options,
-        //             );
-        //             udp_client.connect().await?;
-        //         }
-        //     }
-        // }
 
         Ok(())
     }
