@@ -1,7 +1,8 @@
 use hickory_resolver::config::{NameServerConfig, ResolverConfig};
 use hickory_resolver::name_server::TokioConnectionProvider;
 use hickory_resolver::proto::xfer::Protocol;
-use hickory_resolver::Resolver;
+use hickory_resolver::proto::ProtoErrorKind;
+use hickory_resolver::{ResolveErrorKind, Resolver};
 
 use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -25,7 +26,7 @@ use crate::util::time::{calc_connect_ms, time_now_us};
 
 #[derive(Debug, Clone)]
 pub struct DnsClientOptions {
-    pub remote_host: Vec<String>,
+    pub remote_host: String,
     pub remote_port: u16,
     pub local_ipv4: IpAddr,
     pub local_ipv6: IpAddr,
@@ -50,17 +51,12 @@ impl DnsClient {
         };
 
         // Resolve the destination host to IPv4 and IPv6 addresses.
-
-        let mut host_records = vec![];
-        for host in self.client_options.remote_host.iter() {
-            host_records.push(HostRecord::new(&host, self.client_options.remote_port).await);
-        }
-
-        let resolved_hosts = resolve_host(host_records).await;
+        let host_records = HostRecord::new(&self.client_options.remote_host, self.client_options.remote_port).await;
+        let hosts = vec![host_records.clone()];
+        let resolved_hosts = resolve_host(hosts).await;
 
         // Check if the host resolved to an IPv4 or IPv6 addresses.
         // If not, return an error.
-
         for record in &resolved_hosts {
             match record.ipv4_sockets.is_empty() && record.ipv6_sockets.is_empty() {
                 true => bail!("{} did not resolve to an IP address", record.host),
@@ -97,7 +93,7 @@ impl DnsClient {
         let mut send_count: u16 = 0;
 
         let ping_header = ping_header_msg(
-            &self.client_options.remote_host[0],
+            &self.client_options.remote_host,
             self.client_options.remote_port,
             self.ping_options.method,
         );
@@ -172,7 +168,7 @@ impl DnsClient {
         client_results.sort_by_key(|x| x.destination.to_owned());
 
         let summary_table = client_summary_table_msg(
-            &self.client_options.remote_host[0],
+            &self.client_options.remote_host,
             self.client_options.remote_port,
             self.ping_options.method,
             &client_results,
@@ -230,7 +226,6 @@ async fn process_host(
 }
 
 async fn connect_host(
-    // host_record: HostRecord,
     client_options: DnsClientOptions,
     local: IpPort,
     dst_socket: SocketAddr,
@@ -263,6 +258,7 @@ async fn connect_host(
         });
     }
 
+    // Map to symbol used by Hickory resolver.
     let transport_protocol = match client_options.transport {
         Transport::Tcp => Protocol::Tcp,
         Transport::Udp => Protocol::Udp,
@@ -297,19 +293,43 @@ async fn connect_host(
     // record timestamp before connection
     let pre_conn_timestamp = time_now_us();
 
+    // `lookup_ip` returns an error if the dns record is not found.
+    // `server_connected` is used to reduce repeating successful
+    // params in `conn_record` in the error case.
+    let mut server_connected = false;
     match resolver.lookup_ip(client_options.domain).await {
         Ok(_) => {
-            let post_conn_timestamp = time_now_us();
-            let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
-            conn_record.success = true;
-            conn_record.time = connection_time;
-            conn_record.result = ConnectResult::Pong;
-            // reponse.as_lookup().record_iter().
+            server_connected = true;
         }
         Err(e) => {
-            println!("{}", e);
-            conn_record.result = ConnectResult::Error;
+            // If we get these errors, we get a reply from the server,
+            // which is what we are testing.
+            // Check specific error kinds from hickory resolver
+            if e.is_no_records_found() || e.is_nx_domain() {
+                server_connected = true;
+            }
+            match e.kind() {
+                ResolveErrorKind::Proto(proto_err) => {
+                    // Check the specific proto error kind
+                    match proto_err.kind() {
+                        ProtoErrorKind::NoRecordsFound { .. } => {
+                            server_connected = true;
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
         }
+    };
+    if server_connected {
+        let post_conn_timestamp = time_now_us();
+        let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
+        conn_record.success = true;
+        conn_record.time = connection_time;
+        conn_record.result = ConnectResult::Pong;
+    } else {
+        conn_record.result = ConnectResult::Error;
     }
 
     Ok(conn_record)

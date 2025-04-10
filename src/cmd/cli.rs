@@ -46,8 +46,8 @@ pub enum Command {
     /// DNS connection
     Dns {
         /// Remote host(s). Seperate hosts with a space ' '. EG: 1.1.1.1 9.9.9.9
-        #[clap(short = 'H', long, display_order = 1, value_delimiter = ' ', num_args = 1..)]
-        remote_host: Vec<String>,
+        #[clap(short = 'H', long, display_order = 1)]
+        remote_host: String,
 
         /// Remote port
         #[clap(short = 'P', long, default_value_t = DNS_PORT, display_order = 2)]
