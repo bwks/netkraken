@@ -9,13 +9,13 @@ use crate::core::config::Config;
 use crate::core::konst::{
     BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CLI_HEADER_MSG, CONFIG_FILE, CURRENT_DIR, DNS_LOOKUP_DOMAIN, DNS_PORT,
     HTTPS_PORT, HTTP_PORT, LOGFILE_NAME, LOGGING_JSON, LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER,
-    PING_REPEAT, PING_TIMEOUT,
+    PING_REPEAT, PING_TIMEOUT, TCP_PORT, UDP_PORT,
 };
 use crate::dns::client::{DnsClient, DnsClientOptions};
 use crate::http::client::{HttpClient, HttpClientOptions};
-use crate::tcp::client::TcpClient;
+use crate::tcp::client::{TcpClient, TcpClientOptions};
 use crate::tcp::server::TcpServer;
-use crate::udp::client::UdpClient;
+use crate::udp::client::{UdpClient, UdpClientOptions};
 use crate::udp::server::UdpServer;
 use crate::util::parser::parse_ipaddr;
 use crate::util::validate::validate_local_ip;
@@ -93,10 +93,32 @@ pub enum Command {
     },
 
     /// TCP connection
-    Tcp,
+    Tcp {
+        /// Remote host
+        #[clap(short = 'H', long, display_order = 1)]
+        remote_host: String,
+
+        /// Remote port
+        #[clap(short = 'p', long, display_order = 2)]
+        remote_port: u16,
+
+        #[clap(flatten)]
+        shared_options: SharedOptions,
+    },
 
     /// UDP connection
-    Udp,
+    Udp {
+        /// Remote host
+        #[clap(short = 'H', long, display_order = 1)]
+        remote_host: String,
+
+        /// Remote port
+        #[clap(short = 'p', long, display_order = 2)]
+        remote_port: u16,
+
+        #[clap(flatten)]
+        shared_options: SharedOptions,
+    },
 
     /// Generate a NetKraken config
     Config {
@@ -238,15 +260,15 @@ impl Cli {
             _ => SharedOptions::default(),
         };
 
-        if let Command::Config { command } = &cli.command {
-            // Handle config command here
-            match command {
-                ConfigCommand::Create { file, force } => {
-                    Config::generate(&file, *force)?;
-                }
-            }
-            return Ok(());
-        }
+        // if let Command::Config { command } = &cli.command {
+        //     // Handle config command here
+        //     match command {
+        //         ConfigCommand::Create { file, force } => {
+        //             Config::generate(&file, *force)?;
+        //         }
+        //     }
+        //     return Ok(());
+        // }
 
         let config = match Config::load(&shared_options.config) {
             Ok(config) => {
@@ -339,6 +361,15 @@ impl Cli {
         // endregion: ===== validators ===== //
 
         match cli.command {
+            Command::Config { command } => {
+                // Handle config command here
+                match command {
+                    ConfigCommand::Create { file, force } => {
+                        Config::generate(&file, force)?;
+                    }
+                }
+                return Ok(());
+            }
             Command::Dns {
                 remote_host,
                 remote_port,
@@ -423,7 +454,74 @@ impl Cli {
                 };
                 http_client.connect().await?;
             }
-            _ => {}
+            Command::Tcp {
+                remote_host,
+                remote_port,
+                shared_options,
+            } => {
+                let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
+                let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
+                let local_port = shared_options.local_port;
+
+                let tcp_client_options = TcpClientOptions {
+                    remote_host,
+                    remote_port,
+                    local_ipv4,
+                    local_ipv6,
+                    local_port,
+                };
+                if shared_options.listen {
+                    let tcp_server = TcpServer {
+                        listen_ip: tcp_client_options.local_ipv4.to_string(),
+                        listen_port: tcp_client_options.local_port,
+                        logging_options,
+                        listen_options,
+                    };
+                    tcp_server.listen().await?;
+                } else {
+                    let tcp_client = TcpClient {
+                        client_options: tcp_client_options,
+                        logging_options,
+                        ping_options,
+                        ip_options,
+                    };
+                    tcp_client.connect().await?;
+                }
+            }
+            Command::Udp {
+                remote_host,
+                remote_port,
+                shared_options,
+            } => {
+                let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
+                let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
+                let local_port = shared_options.local_port;
+
+                let udp_client_options = UdpClientOptions {
+                    remote_host,
+                    remote_port,
+                    local_ipv4,
+                    local_ipv6,
+                    local_port,
+                };
+                if shared_options.listen {
+                    let tcp_server = UdpServer {
+                        listen_ip: udp_client_options.local_ipv4.to_string(),
+                        listen_port: udp_client_options.local_port,
+                        logging_options,
+                        listen_options,
+                    };
+                    tcp_server.listen().await?;
+                } else {
+                    let tcp_client = UdpClient {
+                        client_options: udp_client_options,
+                        logging_options,
+                        ping_options,
+                        ip_options,
+                    };
+                    tcp_client.connect().await?;
+                }
+            }
         }
         // match cli.method {
         //     ConnectMethod::DNS => {}

@@ -16,67 +16,36 @@ use crate::core::konst::{BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, BUFFER_SIZE,
 use crate::util::dns::resolve_host;
 use crate::util::handler::{io_error_switch_handler, log_handler2, loop_handler};
 use crate::util::message::{client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg};
-use crate::util::parser::parse_ipaddr;
 use crate::util::result::{client_summary_result, get_results_map};
 use crate::util::time::{calc_connect_ms, time_now_us};
 
+#[derive(Debug, Clone)]
+pub struct UdpClientOptions {
+    pub remote_host: String,
+    pub remote_port: u16,
+    pub local_ipv4: IpAddr,
+    pub local_ipv6: IpAddr,
+    pub local_port: u16,
+}
+
 pub struct UdpClient {
-    pub dst_ip: String,
-    pub dst_port: u16,
-    pub src_ipv4: Option<IpAddr>,
-    pub src_ipv6: Option<IpAddr>,
-    pub src_port: u16,
-    pub output_options: LoggingOptions,
+    pub client_options: UdpClientOptions,
+    pub logging_options: LoggingOptions,
     pub ping_options: PingOptions,
     pub ip_options: IpOptions,
 }
 
 impl UdpClient {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        dst_ip: String,
-        dst_port: u16,
-        src_ipv4: Option<String>,
-        src_ipv6: Option<String>,
-        src_port: Option<u16>,
-        output_options: LoggingOptions,
-        ping_options: PingOptions,
-        ip_options: IpOptions,
-    ) -> UdpClient {
-        let src_ipv4 = match src_ipv4 {
-            Some(x) => parse_ipaddr(&x).ok(),
-            None => parse_ipaddr(BIND_ADDR_IPV4).ok(),
-        };
-
-        let src_ipv6 = match src_ipv6 {
-            Some(x) => parse_ipaddr(&x).ok(),
-            None => parse_ipaddr(BIND_ADDR_IPV6).ok(),
-        };
-
-        let src_port = src_port.unwrap_or(BIND_PORT);
-
-        UdpClient {
-            dst_ip,
-            dst_port,
-            src_ipv4,
-            src_ipv6,
-            src_port,
-            output_options,
-            ping_options,
-            ip_options,
-        }
-    }
-
     pub async fn connect(&self) -> Result<()> {
         let src_ip_port = IpPort {
             // These should never be None at this point as they are set in the UdpClient::new() constructor.
-            ipv4: self.src_ipv4.unwrap(),
-            ipv6: self.src_ipv6.unwrap(),
-            port: self.src_port,
+            ipv4: self.client_options.local_ipv4,
+            ipv6: self.client_options.local_ipv6,
+            port: self.client_options.local_port,
         };
 
         // Resolve the destination host to IPv4 and IPv6 addresses.
-        let host_records = HostRecord::new(&self.dst_ip, self.dst_port).await;
+        let host_records = HostRecord::new(&self.client_options.remote_host, self.client_options.remote_port).await;
         let hosts = vec![host_records.clone()];
         let resolved_hosts = resolve_host(hosts).await;
 
@@ -116,7 +85,11 @@ impl UdpClient {
         let mut count: u16 = 0;
         let mut send_count: u16 = 0;
 
-        let ping_header = ping_header_msg(&self.dst_ip, self.dst_port, ConnectMethod::UDP);
+        let ping_header = ping_header_msg(
+            &self.client_options.remote_host,
+            self.client_options.remote_port,
+            ConnectMethod::UDP,
+        );
         println!("{ping_header}");
 
         // This is a signal handler that listens for a Ctrl-C signal.
@@ -163,7 +136,7 @@ impl UdpClient {
                         .push(result.time);
 
                     let success_msg = client_result_msg(&result);
-                    log_handler2(&result, &success_msg, &self.output_options).await;
+                    log_handler2(&result, &success_msg, &self.logging_options).await;
                 }
             }
             send_count += 1;
@@ -179,7 +152,12 @@ impl UdpClient {
         }
         client_results.sort_by_key(|x| x.destination.to_owned());
 
-        let summary_table = client_summary_table_msg(&self.dst_ip, self.dst_port, ConnectMethod::UDP, &client_results);
+        let summary_table = client_summary_table_msg(
+            &self.client_options.remote_host,
+            self.client_options.remote_port,
+            ConnectMethod::UDP,
+            &client_results,
+        );
         println!("{}", summary_table);
 
         Ok(())
