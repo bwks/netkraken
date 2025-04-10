@@ -315,10 +315,14 @@ async fn connect_host(
                         ProtoErrorKind::NoRecordsFound { .. } => {
                             server_connected = true;
                         }
-                        _ => {}
+                        _ => {
+                            conn_record.error_msg = Some(e.to_string());
+                        }
                     }
                 }
-                _ => {}
+                _ => {
+                    conn_record.error_msg = Some(e.to_string());
+                }
             }
         }
     };

@@ -337,7 +337,7 @@ impl Cli {
                 let dns_client = DnsClient {
                     client_options: dns_client_options,
                     logging_options: logging_options.clone(),
-                    ping_options: ping_options.clone(),
+                    ping_options,
                     ip_options,
                 };
                 dns_client.connect().await?;

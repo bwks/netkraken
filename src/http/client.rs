@@ -47,10 +47,7 @@ impl HttpClient {
             ipv6: self.client_options.local_ipv6,
             port: self.client_options.local_port,
         };
-        let protocol = match self.client_options.scheme {
-            HttpScheme::Http => ConnectMethod::Http,
-            HttpScheme::Https => ConnectMethod::Https,
-        };
+        let protocol = get_connect_method(&self.client_options.scheme);
 
         // Resolve the destination host to IPv4 and IPv6 addresses.
         let host_records = HostRecord::new(&self.client_options.remote_host, self.client_options.remote_port).await;
@@ -194,10 +191,6 @@ async fn process_host(
         IpProtocol::V4 => host_record_clone.ipv4_sockets,
         IpProtocol::V6 => host_record_clone.ipv6_sockets,
     };
-    let protocol = match client_options.scheme {
-        HttpScheme::Http => ConnectMethod::Http,
-        HttpScheme::Https => ConnectMethod::Https,
-    };
     let results: Vec<ConnectRecord> = futures::stream::iter(sockets)
         .map(|dst_socket| {
             {
@@ -217,7 +210,7 @@ async fn process_host(
                         Ok(record) => record,
                         Err(e) => ConnectRecord {
                             result: ConnectResult::Unknown,
-                            protocol,
+                            protocol: get_connect_method(&client_options.scheme),
                             source: src_ip_port.ipv4.to_string(),
                             destination: dst_socket.to_string(),
                             time: -1.0,
@@ -259,10 +252,7 @@ async fn connect_host(
         }
     };
 
-    let protocol = match client_options.scheme {
-        HttpScheme::Http => ConnectMethod::Http,
-        HttpScheme::Https => ConnectMethod::Https,
-    };
+    let protocol = get_connect_method(&client_options.scheme);
 
     let _version = client_options.version;
 
@@ -280,8 +270,8 @@ async fn connect_host(
     }
 
     let mut headers = HeaderMap::new();
-
     headers.insert("x-custom-header", "netkraken".parse().unwrap());
+    headers.insert("connection", "close".parse().unwrap());
 
     let http_client = match client_options.scheme {
         HttpScheme::Http => {
@@ -324,7 +314,7 @@ async fn connect_host(
 
     let url = format!("{}://{}", client_options.scheme, host_record.host);
 
-    match http_client.get(url.clone()).header("Connection", "close").send().await {
+    match http_client.get(url.clone()).send().await {
         Ok(response) => {
             let post_conn_timestamp = time_now_us();
             let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
@@ -339,16 +329,33 @@ async fn connect_host(
             }
         }
         Err(e) => {
-            conn_record.error_msg = Some(e.to_string());
-            if e.is_timeout() {
-                conn_record.result = ConnectResult::Timeout;
-            } else if e.is_connect() {
-                conn_record.result = ConnectResult::ConnectError;
+            if e.is_connect() && e.to_string().contains("https") {
+                // println!("REDIRECTED TO HTTPS");
+                let post_conn_timestamp = time_now_us();
+                let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
+                conn_record.success = true;
+                conn_record.time = connection_time;
+                conn_record.result = ConnectResult::Pong;
             } else {
-                conn_record.result = ConnectResult::Error;
+                conn_record.error_msg = Some(e.to_string());
+                if e.is_timeout() {
+                    conn_record.result = ConnectResult::Timeout;
+                } else if e.is_connect() {
+                    conn_record.result = ConnectResult::ConnectError;
+                } else {
+                    conn_record.result = ConnectResult::Error;
+                }
             }
         }
     };
 
     Ok(conn_record)
+}
+
+// Map the `ConnectMethod` from the `HttpScheme`
+fn get_connect_method(scheme: &HttpScheme) -> ConnectMethod {
+    match scheme {
+        HttpScheme::Http => ConnectMethod::Http,
+        HttpScheme::Https => ConnectMethod::Https,
+    }
 }
