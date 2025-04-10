@@ -1,3 +1,5 @@
+use std::net::IpAddr;
+
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
 
@@ -267,52 +269,27 @@ impl Cli {
         // If a CLI option is NOT the same as the default,
         // the option was set from the CLI. Therefore we should
         // use the CLI option. Otherwise use the config file option.
+        #[rustfmt::skip]
         let mut ping_options = PingOptions {
-            repeat: if shared_options.repeat != PING_REPEAT {
-                shared_options.repeat
-            } else {
-                config.ping_options.repeat
-            },
-            interval: if shared_options.interval != PING_INTERVAL {
-                shared_options.interval
-            } else {
-                config.ping_options.interval
-            },
-            timeout: if shared_options.timeout != PING_TIMEOUT {
-                shared_options.timeout
-            } else {
-                config.ping_options.timeout
-            },
-            nk_peer: if shared_options.nk_peer != PING_NK_PEER {
-                shared_options.nk_peer
-            } else {
-                config.ping_options.nk_peer
-            },
+            repeat: if shared_options.repeat != PING_REPEAT { shared_options.repeat } else { config.ping_options.repeat },
+            interval: if shared_options.interval != PING_INTERVAL { shared_options.interval } else { config.ping_options.interval },
+            timeout: if shared_options.timeout != PING_TIMEOUT { shared_options.timeout } else { config.ping_options.timeout },
+            nk_peer: if shared_options.nk_peer != PING_NK_PEER { shared_options.nk_peer } else { config.ping_options.nk_peer },
             method: ConnectMethod::default(),
         };
 
+        #[rustfmt::skip]
         let listen_options = ListenOptions {
-            nk_peer: if shared_options.nk_peer != PING_NK_PEER {
-                shared_options.nk_peer
-            } else {
-                config.listen_options.nk_peer
-            },
+            nk_peer: if shared_options.nk_peer != PING_NK_PEER { shared_options.nk_peer } else { config.listen_options.nk_peer },
         };
 
+        #[rustfmt::skip]
         let logging_options = LoggingOptions {
             file: if shared_options.file != LOGFILE_NAME { shared_options.file } else { config.logging_options.file },
             dir: if shared_options.dir != CURRENT_DIR { shared_options.dir } else { config.logging_options.dir },
             json: if shared_options.json != LOGGING_JSON { shared_options.json } else { config.logging_options.json },
-            quiet: if shared_options.quiet != LOGGING_QUIET {
-                shared_options.quiet
-            } else {
-                config.logging_options.quiet
-            },
-            syslog: if shared_options.syslog != LOGGING_SYSLOG {
-                shared_options.syslog
-            } else {
-                config.logging_options.syslog
-            },
+            quiet: if shared_options.quiet != LOGGING_QUIET { shared_options.quiet } else { config.logging_options.quiet },
+            syslog: if shared_options.syslog != LOGGING_SYSLOG { shared_options.syslog } else { config.logging_options.syslog },
         };
 
         // region:    ===== validators ===== //
@@ -344,11 +321,9 @@ impl Cli {
                 transport,
                 shared_options,
             } => {
-                let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
-                let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
-                let local_port = shared_options.local_port;
-
                 ping_options.method = ConnectMethod::Dns;
+
+                let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
 
                 let dns_client_options = DnsClientOptions {
                     remote_host: remote_host.clone(),
@@ -373,11 +348,9 @@ impl Cli {
                 version,
                 shared_options,
             } => {
-                let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
-                let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
-                let local_port = shared_options.local_port;
-
                 ping_options.method = ConnectMethod::Http;
+
+                let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
 
                 let http_client_options = HttpClientOptions {
                     remote_host,
@@ -402,11 +375,9 @@ impl Cli {
                 version,
                 shared_options,
             } => {
-                let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
-                let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
-                let local_port = shared_options.local_port;
-
                 ping_options.method = ConnectMethod::Https;
+
+                let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
 
                 let http_client_options = HttpClientOptions {
                     remote_host,
@@ -430,11 +401,9 @@ impl Cli {
                 remote_port,
                 shared_options,
             } => {
-                let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
-                let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
-                let local_port = shared_options.local_port;
-
                 ping_options.method = ConnectMethod::Tcp;
+
+                let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
 
                 let tcp_client_options = TcpClientOptions {
                     remote_host,
@@ -466,11 +435,9 @@ impl Cli {
                 remote_port,
                 shared_options,
             } => {
-                let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
-                let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
-                let local_port = shared_options.local_port;
-
                 ping_options.method = ConnectMethod::Udp;
+
+                let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
 
                 let udp_client_options = UdpClientOptions {
                     remote_host,
@@ -501,4 +468,12 @@ impl Cli {
 
         Ok(())
     }
+}
+
+/// Get the local parmaters from the shared options.
+fn get_local_params(shared_options: &SharedOptions) -> Result<(IpAddr, IpAddr, u16)> {
+    let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
+    let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
+    let local_port = shared_options.local_port;
+    Ok((local_ipv4, local_ipv6, local_port))
 }
