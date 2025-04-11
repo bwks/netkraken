@@ -297,43 +297,58 @@ async fn connect_host(
     // `server_connected` is used to reduce repeating successful
     // params in `conn_record` in the error case.
     let mut server_connected = false;
-    match resolver.lookup_ip(client_options.domain).await {
-        Ok(_) => {
-            server_connected = true;
-        }
-        Err(e) => {
-            // If we get these errors, we get a reply from the server,
-            // which is what we are testing.
-            // Check specific error kinds from hickory resolver
-            if e.is_no_records_found() || e.is_nx_domain() {
+
+    // DOGWATER: I could not find a method to set the timeout in the Hickory resolver config.
+    // Wrap the request in a tokio timeout to control this until a method can be
+    // found in the Hickory Resolver.
+    let result = tokio::time::timeout(
+        std::time::Duration::from_millis(ping_options.timeout as u64),
+        resolver.lookup_ip(client_options.domain),
+    )
+    .await;
+
+    match result {
+        // We connected to the server
+        Ok(lookup_result) => match lookup_result {
+            Ok(_) => {
                 server_connected = true;
             }
-            match e.kind() {
-                ResolveErrorKind::Proto(proto_err) => {
-                    // Check the specific proto error kind
-                    match proto_err.kind() {
+            Err(e) => {
+                // We got a DNS response from the server, convert the error to success.
+                if e.is_no_records_found() || e.is_nx_domain() {
+                    server_connected = true;
+                }
+                match e.kind() {
+                    ResolveErrorKind::Proto(proto_err) => match proto_err.kind() {
+                        // This is also a successful connection
                         ProtoErrorKind::NoRecordsFound { .. } => {
                             server_connected = true;
                         }
+                        // Error case
                         _ => {
                             conn_record.error_msg = Some(e.to_string());
                         }
+                    },
+                    // Error case
+                    _ => {
+                        conn_record.error_msg = Some(e.to_string());
                     }
                 }
-                _ => {
-                    conn_record.error_msg = Some(e.to_string());
-                }
             }
+        },
+        Err(_) => {
+            // Timeout connecting to the server
+            conn_record.result = ConnectResult::Timeout;
+            conn_record.error_msg = Some("DNS lookup timed out".to_owned());
         }
     };
+
     if server_connected {
         let post_conn_timestamp = time_now_us();
         let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
         conn_record.success = true;
         conn_record.time = connection_time;
         conn_record.result = ConnectResult::Pong;
-    } else {
-        conn_record.result = ConnectResult::Error;
     }
 
     Ok(conn_record)
