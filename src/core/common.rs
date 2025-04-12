@@ -3,6 +3,7 @@ use std::net::{IpAddr, SocketAddr};
 
 use anyhow::Result;
 use clap::ValueEnum;
+use reqwest::StatusCode;
 use serde_derive::{Deserialize, Serialize};
 use tabled::Tabled;
 
@@ -10,38 +11,76 @@ use crate::core::konst::{
     CURRENT_DIR, LOGFILE_NAME, LOGGING_JSON, LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER, PING_REPEAT,
     PING_TIMEOUT,
 };
+use crate::util::serializer::serialize_status_code;
 use crate::util::time::{time_now_us, time_now_utc};
+
+#[derive(Copy, Clone, Debug)]
+pub enum ConnectResult {
+    Http(StatusCode),
+    Success(ConnectSuccess),
+    Error(ConnectError),
+}
+
+impl serde::Serialize for ConnectResult {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            ConnectResult::Http(status) => serialize_status_code(status, serializer),
+            ConnectResult::Success(success) => success.serialize(serializer),
+            ConnectResult::Error(error) => error.serialize(serializer),
+        }
+    }
+}
+impl Display for ConnectResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ConnectResult::Http(http) => http.fmt(f),
+            ConnectResult::Success(success) => success.fmt(f),
+            ConnectResult::Error(error) => error.fmt(f),
+        }
+    }
+}
 
 #[allow(dead_code)]
 #[derive(Copy, Clone, Debug, Serialize)]
-pub enum ConnectResult {
+pub enum ConnectSuccess {
     // Success
     Ping,
     Pong,
-
-    // Errors
-    ConnectError,
+    Reply,
+}
+impl Display for ConnectSuccess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ConnectSuccess::Ping => write!(f, "ping"),
+            ConnectSuccess::Pong => write!(f, "pong"),
+            ConnectSuccess::Reply => write!(f, "reply"),
+        }
+    }
+}
+#[allow(dead_code)]
+#[derive(Copy, Clone, Debug, Serialize)]
+pub enum ConnectError {
+    ConnectionError,
     Error,
     Refused,
     Reset,
     Timeout,
     Unknown,
-
-    // Bind Error
     BindError,
 }
-impl Display for ConnectResult {
+impl Display for ConnectError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConnectResult::Ping => write!(f, "ping"),
-            ConnectResult::Pong => write!(f, "pong"),
-            ConnectResult::ConnectError => write!(f, "connect_error"),
-            ConnectResult::Error => write!(f, "error"),
-            ConnectResult::Refused => write!(f, "refused"),
-            ConnectResult::Reset => write!(f, "reset"),
-            ConnectResult::Timeout => write!(f, "timeout"),
-            ConnectResult::Unknown => write!(f, "unknown"),
-            ConnectResult::BindError => write!(f, "bind_error"),
+            ConnectError::ConnectionError => write!(f, "connect_error"),
+            ConnectError::Error => write!(f, "error"),
+            ConnectError::Refused => write!(f, "refused"),
+            ConnectError::Reset => write!(f, "reset"),
+            ConnectError::Timeout => write!(f, "timeout"),
+            ConnectError::Unknown => write!(f, "unknown"),
+            ConnectError::BindError => write!(f, "bind_error"),
         }
     }
 }

@@ -4,7 +4,7 @@ use tokio::io::AsyncReadExt;
 use tokio::io::AsyncWriteExt;
 use tokio::net::TcpListener;
 
-use crate::core::common::{ConnectMethod, ConnectResult, ListenOptions, LogLevel, LoggingOptions};
+use crate::core::common::{ConnectMethod, ConnectResult, ConnectSuccess, ListenOptions, LogLevel, LoggingOptions};
 use crate::core::konst::{BIND_ADDR_IPV4, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::log_handler;
 use crate::util::message::{server_conn_success_msg, server_start_msg};
@@ -70,7 +70,7 @@ impl TcpServer {
                 }
 
                 let msg = server_conn_success_msg(
-                    ConnectResult::Ping,
+                    ConnectResult::Success(ConnectSuccess::Ping),
                     ConnectMethod::Tcp,
                     &stream.peer_addr()?.to_string(),
                     &stream.local_addr()?.to_string(),

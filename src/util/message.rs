@@ -61,26 +61,30 @@ pub fn ping_header_msg(destination: &String, port: u16, protocol: ConnectMethod)
 /// Returns a client result message
 pub fn client_result_msg(record: &ConnectRecord) -> String {
     match record.result {
-        ConnectResult::Ping | ConnectResult::Pong => {
+        ConnectResult::Http(result) => {
             format!(
                 "{} => proto={} src={} dst={} time={:.3}ms",
-                record.result,
+                result.as_u16(),
                 record.protocol.to_string().to_uppercase(),
                 record.source,
                 record.destination,
                 record.time,
             )
         }
-        ConnectResult::ConnectError
-        | ConnectResult::Error
-        | ConnectResult::Refused
-        | ConnectResult::Reset
-        | ConnectResult::Timeout
-        | ConnectResult::Unknown
-        | ConnectResult::BindError => {
+        ConnectResult::Success(result) => {
+            format!(
+                "{} => proto={} src={} dst={} time={:.3}ms",
+                result,
+                record.protocol.to_string().to_uppercase(),
+                record.source,
+                record.destination,
+                record.time,
+            )
+        }
+        ConnectResult::Error(result) => {
             format!(
                 "{} => proto={} src={} dst={}",
-                record.result,
+                result,
                 record.protocol.to_string().to_uppercase(),
                 record.source,
                 record.destination,
@@ -149,7 +153,7 @@ pub fn server_conn_success_msg(
 mod tests {
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
-    use crate::core::common::HostRecord;
+    use crate::core::common::{ConnectSuccess, HostRecord};
     use crate::core::konst::CLI_HEADER_MSG;
     use crate::util::message::*;
 
@@ -268,7 +272,7 @@ mod tests {
     #[test]
     fn server_conn_success_msg_with_time_is_expected() {
         let msg = server_conn_success_msg(
-            ConnectResult::Ping,
+            ConnectResult::Success(ConnectSuccess::Ping),
             ConnectMethod::Tcp,
             &"127.0.0.1:13337".to_string(),
             &"127.0.0.1:8080".to_string(),
@@ -284,7 +288,7 @@ mod tests {
     #[test]
     fn server_conn_success_msg_without_time_is_expected() {
         let msg = server_conn_success_msg(
-            ConnectResult::Ping,
+            ConnectResult::Success(ConnectSuccess::Ping),
             ConnectMethod::Tcp,
             &"127.0.0.1:13337".to_string(),
             &"127.0.0.1:8080".to_string(),

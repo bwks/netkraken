@@ -4,7 +4,7 @@ use tracing::Level;
 
 use crate::core::common::LogLevel;
 use crate::core::common::LoggingOptions;
-use crate::core::common::{ConnectRecord, ConnectResult};
+use crate::core::common::{ConnectError, ConnectRecord};
 use crate::core::konst::APP_NAME;
 
 /// Handler to manage loop iterations. On `true` the loop
@@ -49,12 +49,12 @@ pub async fn log_handler(log_level: LogLevel, message: &String, logging_options:
     }
 }
 
-pub fn io_error_switch_handler(error: std::io::Error) -> ConnectResult {
+pub fn io_error_switch_handler(error: std::io::Error) -> ConnectError {
     match error.kind() {
-        std::io::ErrorKind::ConnectionRefused => ConnectResult::Refused,
-        std::io::ErrorKind::ConnectionReset => ConnectResult::Reset,
-        std::io::ErrorKind::TimedOut => ConnectResult::Timeout,
-        _ => ConnectResult::Unknown,
+        std::io::ErrorKind::ConnectionRefused => ConnectError::Refused,
+        std::io::ErrorKind::ConnectionReset => ConnectError::Reset,
+        std::io::ErrorKind::TimedOut => ConnectError::Timeout,
+        _ => ConnectError::Unknown,
     }
 }
 

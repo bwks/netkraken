@@ -7,12 +7,13 @@ use futures::StreamExt;
 use hyper_util::client::legacy::connect::HttpInfo;
 use reqwest::header::HeaderMap;
 use reqwest::Client;
+// use reqwest::StatusCode;
 use tokio::signal;
 use tokio::time::Duration;
 
 use crate::core::common::{
-    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, HttpScheme,
-    HttpVersion, IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions,
+    ClientResult, ClientSummary, ConnectError, ConnectMethod, ConnectRecord, ConnectResult, ConnectSuccess, HostRecord,
+    HostResults, HttpScheme, HttpVersion, IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions,
 };
 use crate::core::konst::BUFFER_SIZE;
 use crate::util::dns::resolve_host;
@@ -209,7 +210,7 @@ async fn process_host(
                     {
                         Ok(record) => record,
                         Err(e) => ConnectRecord {
-                            result: ConnectResult::Unknown,
+                            result: ConnectResult::Error(ConnectError::Unknown),
                             protocol: get_connect_method(&client_options.scheme),
                             source: src_ip_port.ipv4.to_string(),
                             destination: dst_socket.to_string(),
@@ -259,7 +260,7 @@ async fn connect_host(
     // If the source socket is None, we could not bind to the socket.
     if src_socket.is_none() {
         return Ok(ConnectRecord {
-            result: ConnectResult::BindError,
+            result: ConnectResult::Error(ConnectError::BindError),
             protocol,
             source: bind_addr.to_string(),
             destination: dst_socket.to_string(),
@@ -300,7 +301,7 @@ async fn connect_host(
     };
 
     let mut conn_record = ConnectRecord {
-        result: ConnectResult::Unknown,
+        result: ConnectResult::Error(ConnectError::Unknown),
         protocol,
         source: bind_addr.ip().to_string(),
         destination: dst_socket.to_string(),
@@ -320,7 +321,7 @@ async fn connect_host(
             let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
             conn_record.success = true;
             conn_record.time = connection_time;
-            conn_record.result = ConnectResult::Pong;
+            conn_record.result = ConnectResult::Http(response.status());
 
             let local_ip = response.extensions().get::<HttpInfo>().map(|info| info.local_addr());
             if local_ip.is_some() {
@@ -329,21 +330,23 @@ async fn connect_host(
             }
         }
         Err(e) => {
-            if e.is_connect() && e.to_string().contains("https") {
-                // println!("REDIRECTED TO HTTPS");
+            // We got a redirection from http to https we could end up in the error case as
+            // the client does not support this flow. If we are connected, still consider
+            // it a success as we could reach the server.
+            if e.is_connect() {
                 let post_conn_timestamp = time_now_us();
                 let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
                 conn_record.success = true;
                 conn_record.time = connection_time;
-                conn_record.result = ConnectResult::Pong;
+                conn_record.result = ConnectResult::Success(ConnectSuccess::Reply);
             } else {
                 conn_record.error_msg = Some(e.to_string());
                 if e.is_timeout() {
-                    conn_record.result = ConnectResult::Timeout;
+                    conn_record.result = ConnectResult::Error(ConnectError::Timeout);
                 } else if e.is_connect() {
-                    conn_record.result = ConnectResult::ConnectError;
+                    conn_record.result = ConnectResult::Error(ConnectError::ConnectionError);
                 } else {
-                    conn_record.result = ConnectResult::Error;
+                    conn_record.result = ConnectResult::Error(ConnectError::Error);
                 }
             }
         }
