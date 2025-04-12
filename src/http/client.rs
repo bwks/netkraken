@@ -314,7 +314,13 @@ async fn connect_host(
 
     let url = format!("{}://{}", client_options.scheme, host_record.host);
 
-    match http_client.get(url.clone()).send().await {
+    // println!("{:#?}", http_client);
+    match http_client
+        .get(url.clone())
+        .timeout(Duration::from_millis(ping_options.timeout as u64))
+        .send()
+        .await
+    {
         Ok(response) => {
             let post_conn_timestamp = time_now_us();
             let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
