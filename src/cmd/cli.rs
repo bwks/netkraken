@@ -238,9 +238,14 @@ impl Cli {
         println!("{CLI_HEADER_MSG}");
         let cli = Cli::parse();
 
+        // This pulls out the shared options from the nested CLI commands.
         let shared_options = match cli.command {
+            Command::Config { .. } => SharedOptions::default(),
             Command::Dns { ref shared_options, .. } => shared_options.clone(),
-            _ => SharedOptions::default(),
+            Command::Http { ref shared_options, .. } => shared_options.clone(),
+            Command::Https { ref shared_options, .. } => shared_options.clone(),
+            Command::Tcp { ref shared_options, .. } => shared_options.clone(),
+            Command::Udp { ref shared_options, .. } => shared_options.clone(),
         };
 
         let config = match Config::load(&shared_options.config) {
