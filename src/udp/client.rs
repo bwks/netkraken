@@ -9,8 +9,8 @@ use tokio::signal;
 use tokio::time::{timeout, Duration};
 
 use crate::core::common::{
-    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, ConnectResult2, HostRecord, HostResults,
-    IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions,
+    ClientResult, ClientSummary, ConnectError, ConnectMethod, ConnectRecord, ConnectResult, ConnectSuccess, HostRecord,
+    HostResults, IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions,
 };
 use crate::core::konst::{BUFFER_SIZE, MAX_PACKET_SIZE, PING_MSG};
 use crate::util::dns::resolve_host;
@@ -206,7 +206,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
     // If the source socket is None, we could not bind to the socket.
     if src_socket.is_none() {
         return ConnectRecord {
-            result: ConnectResult2::Old(ConnectResult::BindError),
+            result: ConnectResult::Error(ConnectError::BindError),
             protocol: ConnectMethod::Udp,
             source: bind_addr.to_string(),
             destination: dst_socket.to_string(),
@@ -225,7 +225,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
     let local_addr = &writer.local_addr().unwrap().to_string();
 
     let mut conn_record = ConnectRecord {
-        result: ConnectResult2::Old(ConnectResult::Unknown),
+        result: ConnectResult::Error(ConnectError::Unknown),
         protocol: ConnectMethod::Udp,
         source: local_addr.to_owned(),
         destination: dst_socket.to_string(),
@@ -281,7 +281,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
                 }
 
                 conn_record.success = true;
-                conn_record.result = ConnectResult2::Old(ConnectResult::Pong);
+                conn_record.result = ConnectResult::Success(ConnectSuccess::Pong);
                 conn_record.time = connection_time;
                 // latencies.push(connection_time);
 
@@ -302,7 +302,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
         }
         Err(e) => {
             let error_msg = e.to_string();
-            conn_record.result = ConnectResult2::Old(io_error_switch_handler(e.into()));
+            conn_record.result = ConnectResult::Error(io_error_switch_handler(e.into()));
             conn_record.error_msg = Some(error_msg);
         }
     }

@@ -4,7 +4,7 @@ use anyhow::Result;
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc;
 
-use crate::core::common::{ConnectMethod, ConnectResult, ListenOptions, LogLevel, LoggingOptions};
+use crate::core::common::{ConnectMethod, ConnectResult, ConnectSuccess, ListenOptions, LogLevel, LoggingOptions};
 use crate::core::konst::{BIND_ADDR_IPV4, BIND_PORT, MAX_PACKET_SIZE};
 use crate::util::handler::log_handler;
 use crate::util::message::{server_conn_success_msg, server_start_msg};
@@ -87,7 +87,7 @@ impl UdpServer {
             }
 
             let msg = server_conn_success_msg(
-                ConnectResult::Ping,
+                ConnectResult::Success(ConnectSuccess::Ping),
                 ConnectMethod::Udp,
                 peer_addr,
                 local_addr,

@@ -7,13 +7,13 @@ use futures::StreamExt;
 use hyper_util::client::legacy::connect::HttpInfo;
 use reqwest::header::HeaderMap;
 use reqwest::Client;
-use reqwest::StatusCode;
+// use reqwest::StatusCode;
 use tokio::signal;
 use tokio::time::Duration;
 
 use crate::core::common::{
-    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, ConnectResult2, HostRecord, HostResults,
-    HttpScheme, HttpVersion, IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions,
+    ClientResult, ClientSummary, ConnectError, ConnectMethod, ConnectRecord, ConnectResult, ConnectSuccess, HostRecord,
+    HostResults, HttpScheme, HttpVersion, IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions,
 };
 use crate::core::konst::BUFFER_SIZE;
 use crate::util::dns::resolve_host;
@@ -210,7 +210,7 @@ async fn process_host(
                     {
                         Ok(record) => record,
                         Err(e) => ConnectRecord {
-                            result: ConnectResult2::Old(ConnectResult::Unknown),
+                            result: ConnectResult::Error(ConnectError::Unknown),
                             protocol: get_connect_method(&client_options.scheme),
                             source: src_ip_port.ipv4.to_string(),
                             destination: dst_socket.to_string(),
@@ -260,7 +260,7 @@ async fn connect_host(
     // If the source socket is None, we could not bind to the socket.
     if src_socket.is_none() {
         return Ok(ConnectRecord {
-            result: ConnectResult2::Old(ConnectResult::BindError),
+            result: ConnectResult::Error(ConnectError::BindError),
             protocol,
             source: bind_addr.to_string(),
             destination: dst_socket.to_string(),
@@ -301,7 +301,7 @@ async fn connect_host(
     };
 
     let mut conn_record = ConnectRecord {
-        result: ConnectResult2::Old(ConnectResult::Unknown),
+        result: ConnectResult::Error(ConnectError::Unknown),
         protocol,
         source: bind_addr.ip().to_string(),
         destination: dst_socket.to_string(),
@@ -321,7 +321,7 @@ async fn connect_host(
             let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
             conn_record.success = true;
             conn_record.time = connection_time;
-            conn_record.result = ConnectResult2::Http(response.status());
+            conn_record.result = ConnectResult::Http(response.status());
 
             let local_ip = response.extensions().get::<HttpInfo>().map(|info| info.local_addr());
             if local_ip.is_some() {
@@ -330,33 +330,23 @@ async fn connect_host(
             }
         }
         Err(e) => {
-            // We got a redirection from http to https. Currently the client does not support
-            // this flow. The result is set to 308 permanent redirect if the status code is not
-            // available in the error. For anything else, have some tea.
+            // We got a redirection from http to https we could end up in the error case as
+            // the client does not support this flow. If we are connected, still consider
+            // it a success as we could reach the server.
             if e.is_connect() {
-                let status_code = if e.status().is_some() {
-                    // Got a status code, so use it.
-                    ConnectResult2::Http(e.status().unwrap())
-                } else if client_options.scheme == HttpScheme::Http && e.to_string().contains("https") {
-                    // HTTP -> HTTPs redirect.
-                    ConnectResult2::Http(StatusCode::PERMANENT_REDIRECT)
-                } else {
-                    // YOUR A FUCKING TEAPOT !!!!
-                    ConnectResult2::Http(StatusCode::IM_A_TEAPOT)
-                };
                 let post_conn_timestamp = time_now_us();
                 let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
                 conn_record.success = true;
                 conn_record.time = connection_time;
-                conn_record.result = status_code;
+                conn_record.result = ConnectResult::Success(ConnectSuccess::Reply);
             } else {
                 conn_record.error_msg = Some(e.to_string());
                 if e.is_timeout() {
-                    conn_record.result = ConnectResult2::Old(ConnectResult::Timeout);
+                    conn_record.result = ConnectResult::Error(ConnectError::Timeout);
                 } else if e.is_connect() {
-                    conn_record.result = ConnectResult2::Old(ConnectResult::ConnectError);
+                    conn_record.result = ConnectResult::Error(ConnectError::ConnectionError);
                 } else {
-                    conn_record.result = ConnectResult2::Old(ConnectResult::Error);
+                    conn_record.result = ConnectResult::Error(ConnectError::Error);
                 }
             }
         }
