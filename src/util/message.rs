@@ -4,7 +4,7 @@ use tabled::settings::Panel;
 use tabled::settings::{object::Rows, Alignment, Margin, Modify, Span, Style};
 use tabled::Table;
 
-use crate::core::common::{ClientResult, ConnectMethod, ConnectRecord, ConnectResult, HostRecord};
+use crate::core::common::{ClientResult, ConnectMethod, ConnectRecord, ConnectResult, ConnectResult2, HostRecord};
 
 /// Return server start message
 pub fn server_start_msg(protocol: ConnectMethod, bind_addr: &IpAddr, bind_port: &u16) -> String {
@@ -61,7 +61,7 @@ pub fn ping_header_msg(destination: &String, port: u16, protocol: ConnectMethod)
 /// Returns a client result message
 pub fn client_result_msg(record: &ConnectRecord) -> String {
     match record.result {
-        ConnectResult::Ping | ConnectResult::Pong => {
+        ConnectResult2::Old(ConnectResult::Ping) | ConnectResult2::Old(ConnectResult::Pong) => {
             format!(
                 "{} => proto={} src={} dst={} time={:.3}ms",
                 record.result,
@@ -71,13 +71,14 @@ pub fn client_result_msg(record: &ConnectRecord) -> String {
                 record.time,
             )
         }
-        ConnectResult::ConnectError
-        | ConnectResult::Error
-        | ConnectResult::Refused
-        | ConnectResult::Reset
-        | ConnectResult::Timeout
-        | ConnectResult::Unknown
-        | ConnectResult::BindError => {
+        ConnectResult2::Old(ConnectResult::ConnectError)
+        | ConnectResult2::Old(ConnectResult::Error)
+        | ConnectResult2::Old(ConnectResult::Refused)
+        | ConnectResult2::Old(ConnectResult::Reset)
+        | ConnectResult2::Old(ConnectResult::Timeout)
+        | ConnectResult2::Old(ConnectResult::Unknown)
+        | ConnectResult2::Old(ConnectResult::BindError)
+        | ConnectResult2::Http(_) => {
             format!(
                 "{} => proto={} src={} dst={}",
                 record.result,

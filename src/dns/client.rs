@@ -13,8 +13,8 @@ use futures::StreamExt;
 use tokio::signal;
 
 use crate::core::common::{
-    ClientResult, ClientSummary, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions, IpPort, IpProtocol,
-    LoggingOptions, PingOptions, Transport,
+    ClientResult, ClientSummary, ConnectRecord, ConnectResult, ConnectResult2, HostRecord, HostResults, IpOptions,
+    IpPort, IpProtocol, LoggingOptions, PingOptions, Transport,
 };
 use crate::core::konst::BUFFER_SIZE;
 use crate::util::dns::resolve_host;
@@ -23,7 +23,6 @@ use crate::util::message::{client_result_msg, client_summary_table_msg, ping_hea
 use crate::util::result::{client_summary_result, get_results_map};
 use crate::util::socket::get_tcp_socket;
 use crate::util::time::{calc_connect_ms, time_now_us};
-
 #[derive(Debug, Clone)]
 pub struct DnsClientOptions {
     pub remote_host: String,
@@ -203,7 +202,7 @@ async fn process_host(
                     match connect_host(client_options, src_ip_port, dst_socket, ping_options).await {
                         Ok(record) => record,
                         Err(e) => ConnectRecord {
-                            result: ConnectResult::Unknown,
+                            result: ConnectResult2::Old(ConnectResult::Unknown),
                             protocol: ping_options.method,
                             source: src_ip_port.ipv4.to_string(),
                             destination: dst_socket.to_string(),
@@ -248,7 +247,7 @@ async fn connect_host(
     // If the source socket is None, we could not bind to the socket.
     if local_socket.is_none() {
         return Ok(ConnectRecord {
-            result: ConnectResult::BindError,
+            result: ConnectResult2::Old(ConnectResult::BindError),
             protocol: ping_options.method,
             source: bind_addr.to_string(),
             destination: dst_socket.to_string(),
@@ -281,7 +280,7 @@ async fn connect_host(
     let resolver = Resolver::builder_with_config(config, TokioConnectionProvider::default()).build();
 
     let mut conn_record = ConnectRecord {
-        result: ConnectResult::Unknown,
+        result: ConnectResult2::Old(ConnectResult::Unknown),
         protocol: ping_options.method,
         source: bind_addr.to_string(),
         destination: dst_socket.to_string(),
@@ -338,7 +337,7 @@ async fn connect_host(
         },
         Err(_) => {
             // Timeout connecting to the server
-            conn_record.result = ConnectResult::Timeout;
+            conn_record.result = ConnectResult2::Old(ConnectResult::Timeout);
             conn_record.error_msg = Some("DNS lookup timed out".to_owned());
         }
     };
@@ -348,7 +347,7 @@ async fn connect_host(
         let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
         conn_record.success = true;
         conn_record.time = connection_time;
-        conn_record.result = ConnectResult::Pong;
+        conn_record.result = ConnectResult2::Old(ConnectResult::Pong);
     }
 
     Ok(conn_record)

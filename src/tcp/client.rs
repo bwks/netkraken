@@ -8,8 +8,8 @@ use tokio::signal;
 use tokio::time::{timeout, Duration};
 
 use crate::core::common::{
-    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, HostRecord, HostResults, IpOptions,
-    IpPort, IpProtocol, LoggingOptions, PingOptions,
+    ClientResult, ClientSummary, ConnectMethod, ConnectRecord, ConnectResult, ConnectResult2, HostRecord, HostResults,
+    IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions,
 };
 use crate::core::konst::BUFFER_SIZE;
 use crate::util::dns::resolve_host;
@@ -213,7 +213,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
     // If the source socket is None, we could not bind to the socket.
     if src_socket.is_none() {
         return ConnectRecord {
-            result: ConnectResult::BindError,
+            result: ConnectResult2::Old(ConnectResult::BindError),
             protocol: ConnectMethod::Tcp,
             source: bind_addr.to_string(),
             destination: dst_socket.to_string(),
@@ -233,7 +233,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
         .to_string();
 
     let mut conn_record = ConnectRecord {
-        result: ConnectResult::Unknown,
+        result: ConnectResult2::Old(ConnectResult::Unknown),
         protocol: ConnectMethod::Tcp,
         source: local_addr,
         destination: dst_socket.to_string(),
@@ -261,7 +261,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
                     .unwrap_or_else(|_| panic!("ERROR GETTING TCP STREAM LOCAL ADDRESS"))
                     .to_string();
                 conn_record.success = true;
-                conn_record.result = ConnectResult::Pong;
+                conn_record.result = ConnectResult2::Old(ConnectResult::Pong);
                 conn_record.time = connection_time;
 
                 // TODO:
@@ -270,14 +270,14 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
             // Connection timeout
             Err(e) => {
                 let error_msg = e.to_string();
-                conn_record.result = io_error_switch_handler(e);
+                conn_record.result = ConnectResult2::Old(io_error_switch_handler(e));
                 conn_record.error_msg = Some(error_msg);
             }
         },
         // Timeout error
         Err(e) => {
             let error_msg = e.to_string();
-            conn_record.result = io_error_switch_handler(e.into());
+            conn_record.result = ConnectResult2::Old(io_error_switch_handler(e.into()));
             conn_record.error_msg = Some(error_msg);
         }
     };

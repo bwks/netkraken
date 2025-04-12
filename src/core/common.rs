@@ -3,6 +3,7 @@ use std::net::{IpAddr, SocketAddr};
 
 use anyhow::Result;
 use clap::ValueEnum;
+use reqwest::StatusCode;
 use serde_derive::{Deserialize, Serialize};
 use tabled::Tabled;
 
@@ -10,7 +11,34 @@ use crate::core::konst::{
     CURRENT_DIR, LOGFILE_NAME, LOGGING_JSON, LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER, PING_REPEAT,
     PING_TIMEOUT,
 };
+use crate::util::serializer::serialize_status_code;
 use crate::util::time::{time_now_us, time_now_utc};
+
+#[derive(Copy, Clone, Debug)]
+pub enum ConnectResult2 {
+    Old(ConnectResult),
+    Http(StatusCode),
+}
+
+impl serde::Serialize for ConnectResult2 {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            ConnectResult2::Old(old) => old.serialize(serializer),
+            ConnectResult2::Http(status) => serialize_status_code(status, serializer),
+        }
+    }
+}
+impl Display for ConnectResult2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ConnectResult2::Old(old) => old.fmt(f),
+            ConnectResult2::Http(http) => http.fmt(f),
+        }
+    }
+}
 
 #[allow(dead_code)]
 #[derive(Copy, Clone, Debug, Serialize)]
@@ -208,7 +236,7 @@ pub struct ListenOptions {
 
 #[derive(Clone, Debug, Serialize)]
 pub struct ConnectRecord {
-    pub result: ConnectResult,
+    pub result: ConnectResult2,
     pub protocol: ConnectMethod,
     pub source: String,
     pub destination: String,
