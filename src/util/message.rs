@@ -76,7 +76,7 @@ pub fn client_result_msg(record: &ConnectRecord) -> String {
         ConnectResult::Success(result) => {
             format!(
                 "{}  {}  proto={}  src={}  dst={}  time={:.3}ms",
-                result.to_string(),
+                result,
                 ARROW,
                 record.protocol.to_string().to_uppercase(),
                 record.source,
@@ -288,7 +288,7 @@ mod tests {
         assert_eq!(
             msg,
             format!(
-                "ping  {}  proto=TCP  src=127.0.0.1:13337  dst=127.0.0.1:8080  time=123.000ms",
+                "Ping  {}  proto=TCP  src=127.0.0.1:13337  dst=127.0.0.1:8080  time=123.000ms",
                 ARROW
             ),
         );
@@ -306,7 +306,7 @@ mod tests {
 
         assert_eq!(
             msg,
-            format!("ping  {}  proto=TCP  src=127.0.0.1:13337  dst=127.0.0.1:8080", ARROW)
+            format!("Ping  {}  proto=TCP  src=127.0.0.1:13337  dst=127.0.0.1:8080", ARROW)
         );
     }
 }
