@@ -14,6 +14,7 @@ use crate::core::konst::{
 use crate::util::serializer::serialize_status_code;
 use crate::util::time::{time_now_us, time_now_utc};
 
+#[allow(dead_code)]
 #[derive(Copy, Clone, Debug)]
 pub enum ConnectResult {
     Http(StatusCode),
@@ -47,6 +48,7 @@ impl Display for ConnectResult {
 #[derive(Copy, Clone, Debug, Serialize)]
 pub enum ConnectSuccess {
     // Success
+    Ok,
     Ping,
     Pong,
     Reply,
@@ -54,6 +56,7 @@ pub enum ConnectSuccess {
 impl Display for ConnectSuccess {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            ConnectSuccess::Ok => write!(f, "ok"),
             ConnectSuccess::Ping => write!(f, "ping"),
             ConnectSuccess::Pong => write!(f, "pong"),
             ConnectSuccess::Reply => write!(f, "reply"),

@@ -20,3 +20,4 @@ pub const DNS_LOOKUP_DOMAIN: &str = "www.microsoft.com";
 pub const DNS_PORT: u16 = 53;
 pub const HTTP_PORT: u16 = 80;
 pub const HTTPS_PORT: u16 = 443;
+pub const ARROW: &str = "➜";

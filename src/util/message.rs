@@ -5,6 +5,7 @@ use tabled::settings::{object::Rows, Alignment, Margin, Modify, Span, Style};
 use tabled::Table;
 
 use crate::core::common::{ClientResult, ConnectMethod, ConnectRecord, ConnectResult, HostRecord};
+use crate::core::konst::ARROW;
 
 /// Return server start message
 pub fn server_start_msg(protocol: ConnectMethod, bind_addr: &IpAddr, bind_port: &u16) -> String {
@@ -63,8 +64,9 @@ pub fn client_result_msg(record: &ConnectRecord) -> String {
     match record.result {
         ConnectResult::Http(result) => {
             format!(
-                "{} => proto={} src={} dst={} time={:.3}ms",
+                "{} {}  proto={}  src={}  dst={}  time={:.3}ms",
                 result.as_u16(),
+                ARROW,
                 record.protocol.to_string().to_uppercase(),
                 record.source,
                 record.destination,
@@ -73,8 +75,9 @@ pub fn client_result_msg(record: &ConnectRecord) -> String {
         }
         ConnectResult::Success(result) => {
             format!(
-                "{} => proto={} src={} dst={} time={:.3}ms",
+                "{} {}  proto={}  src={}  dst={}  time={:.3}ms",
                 result,
+                ARROW,
                 record.protocol.to_string().to_uppercase(),
                 record.source,
                 record.destination,
@@ -83,8 +86,9 @@ pub fn client_result_msg(record: &ConnectRecord) -> String {
         }
         ConnectResult::Error(result) => {
             format!(
-                "{} => proto={} src={} dst={}",
+                "{} {}  proto={}  src={}  dst={}",
                 result,
+                ARROW,
                 record.protocol.to_string().to_uppercase(),
                 record.source,
                 record.destination,
@@ -129,8 +133,9 @@ pub fn server_conn_success_msg(
     match time == 0.0 {
         true => {
             format!(
-                "{} => proto={} src={} dst={}",
+                "{} {}  proto={}  src={}  dst={}",
                 result,
+                ARROW,
                 protocol.to_string().to_uppercase(),
                 source,
                 destination,
@@ -138,8 +143,9 @@ pub fn server_conn_success_msg(
         }
         false => {
             format!(
-                "{} => proto={} src={} dst={} time={:.3}ms",
+                "{} {}  proto={}  src={}  dst={}  time={:.3}ms",
                 result,
+                ARROW,
                 protocol.to_string().to_uppercase(),
                 source,
                 destination,
@@ -281,7 +287,7 @@ mod tests {
 
         assert_eq!(
             msg,
-            "ping => proto=TCP src=127.0.0.1:13337 dst=127.0.0.1:8080 time=123.000ms",
+            "ping ➜  proto=TCP  src=127.0.0.1:13337  dst=127.0.0.1:8080  time=123.000ms",
         );
     }
 
@@ -295,6 +301,6 @@ mod tests {
             0.0,
         );
 
-        assert_eq!(msg, "ping => proto=TCP src=127.0.0.1:13337 dst=127.0.0.1:8080",);
+        assert_eq!(msg, "ping ➜  proto=TCP  src=127.0.0.1:13337  dst=127.0.0.1:8080");
     }
 }

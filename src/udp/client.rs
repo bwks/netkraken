@@ -281,7 +281,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
                 }
 
                 conn_record.success = true;
-                conn_record.result = ConnectResult::Success(ConnectSuccess::Pong);
+                conn_record.result = ConnectResult::Success(ConnectSuccess::Ok);
                 conn_record.time = connection_time;
                 // latencies.push(connection_time);
 
