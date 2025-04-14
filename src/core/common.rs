@@ -56,10 +56,10 @@ pub enum ConnectSuccess {
 impl Display for ConnectSuccess {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConnectSuccess::Ok => write!(f, "ok"),
-            ConnectSuccess::Ping => write!(f, "ping"),
-            ConnectSuccess::Pong => write!(f, "pong"),
-            ConnectSuccess::Reply => write!(f, "reply"),
+            ConnectSuccess::Ok => write!(f, "OK"),
+            ConnectSuccess::Ping => write!(f, "Ping"),
+            ConnectSuccess::Pong => write!(f, "Pong"),
+            ConnectSuccess::Reply => write!(f, "Reply"),
         }
     }
 }
@@ -77,13 +77,13 @@ pub enum ConnectError {
 impl Display for ConnectError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ConnectError::ConnectionError => write!(f, "connect_error"),
-            ConnectError::Error => write!(f, "error"),
-            ConnectError::Refused => write!(f, "refused"),
-            ConnectError::Reset => write!(f, "reset"),
-            ConnectError::Timeout => write!(f, "timeout"),
-            ConnectError::Unknown => write!(f, "unknown"),
-            ConnectError::BindError => write!(f, "bind_error"),
+            ConnectError::ConnectionError => write!(f, "ConnectError"),
+            ConnectError::Error => write!(f, "Error"),
+            ConnectError::Refused => write!(f, "Refused"),
+            ConnectError::Reset => write!(f, "Reset"),
+            ConnectError::Timeout => write!(f, "Timeout"),
+            ConnectError::Unknown => write!(f, "Unknown"),
+            ConnectError::BindError => write!(f, "BindError"),
         }
     }
 }
