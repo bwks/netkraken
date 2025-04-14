@@ -261,7 +261,7 @@ async fn connect_host(src: IpPort, dst_socket: SocketAddr, ping_options: PingOpt
                     .unwrap_or_else(|_| panic!("ERROR GETTING TCP STREAM LOCAL ADDRESS"))
                     .to_string();
                 conn_record.success = true;
-                conn_record.result = ConnectResult::Success(ConnectSuccess::Pong);
+                conn_record.result = ConnectResult::Success(ConnectSuccess::Ok);
                 conn_record.time = connection_time;
 
                 // TODO:

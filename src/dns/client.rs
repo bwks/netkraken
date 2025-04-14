@@ -331,7 +331,7 @@ async fn connect_host(
         let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
         conn_record.success = true;
         conn_record.time = connection_time;
-        conn_record.result = ConnectResult::Success(ConnectSuccess::Reply);
+        conn_record.result = ConnectResult::Success(ConnectSuccess::Ok);
     }
 
     Ok(conn_record)

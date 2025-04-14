@@ -303,7 +303,7 @@ async fn connect_host(
     let mut conn_record = ConnectRecord {
         result: ConnectResult::Error(ConnectError::Unknown),
         protocol,
-        source: bind_addr.ip().to_string(),
+        source: bind_addr.to_string(),
         destination: dst_socket.to_string(),
         time: -1.0,
         success: false,
@@ -321,7 +321,7 @@ async fn connect_host(
             let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
             conn_record.success = true;
             conn_record.time = connection_time;
-            conn_record.result = ConnectResult::Http(response.status());
+            conn_record.result = ConnectResult::Success(ConnectSuccess::Ok);
 
             let local_ip = response.extensions().get::<HttpInfo>().map(|info| info.local_addr());
             if local_ip.is_some() {
@@ -338,7 +338,7 @@ async fn connect_host(
                 let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
                 conn_record.success = true;
                 conn_record.time = connection_time;
-                conn_record.result = ConnectResult::Success(ConnectSuccess::Reply);
+                conn_record.result = ConnectResult::Success(ConnectSuccess::Ok);
             } else {
                 conn_record.error_msg = Some(e.to_string());
                 if e.is_timeout() {
