@@ -45,7 +45,7 @@ pub enum Command {
 
     /// DNS connection
     Dns {
-        /// Remote host(s). Seperate hosts with a space ' '. EG: 1.1.1.1 9.9.9.9
+        /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
         remote_host: String,
 
@@ -83,7 +83,7 @@ pub enum Command {
         shared_options: SharedOptions,
     },
 
-    /// HTTP connection
+    /// HTTPS connection
     Https {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
