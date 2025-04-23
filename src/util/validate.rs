@@ -1,6 +1,6 @@
 use std::net::IpAddr;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 use local_ip_address::list_afinet_netifas;
 

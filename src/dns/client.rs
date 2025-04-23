@@ -1,19 +1,19 @@
+use hickory_resolver::Resolver;
 use hickory_resolver::config::{NameServerConfig, ResolverConfig};
 use hickory_resolver::name_server::TokioConnectionProvider;
 use hickory_resolver::proto::xfer::Protocol;
-use hickory_resolver::Resolver;
 
 use std::net::{IpAddr, SocketAddr};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use futures::StreamExt;
 use tokio::signal;
 
 use crate::core::common::{
-    ClientResult, ClientSummary, ConnectError, ConnectRecord, ConnectResult, ConnectSuccess, HostRecord, HostResults,
-    IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions, Transport,
+    ClientResult, ClientSummary, ConnectError, ConnectMethod, ConnectRecord, ConnectResult, ConnectSuccess, HostRecord,
+    HostResults, IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions, Transport,
 };
 use crate::core::konst::BUFFER_SIZE;
 use crate::util::dns::resolve_host;
@@ -93,7 +93,7 @@ impl DnsClient {
         let ping_header = ping_header_msg(
             &self.client_options.remote_host,
             self.client_options.remote_port,
-            self.ping_options.method,
+            ConnectMethod::Dns,
         );
         println!("{ping_header}");
 
@@ -159,7 +159,7 @@ impl DnsClient {
         for (_, addrs) in results_map {
             for (addr, latencies) in addrs {
                 let client_summary = ClientSummary { send_count, latencies };
-                let summary_msg = client_summary_result(&addr, self.ping_options.method, client_summary);
+                let summary_msg = client_summary_result(&addr, ConnectMethod::Dns, client_summary);
                 client_results.push(summary_msg)
             }
         }
@@ -168,7 +168,7 @@ impl DnsClient {
         let summary_table = client_summary_table_msg(
             &self.client_options.remote_host,
             self.client_options.remote_port,
-            self.ping_options.method,
+            ConnectMethod::Dns,
             &client_results,
         );
         println!("{}", summary_table);
@@ -202,7 +202,7 @@ async fn process_host(
                         Ok(record) => record,
                         Err(e) => ConnectRecord {
                             result: ConnectResult::Error(ConnectError::Unknown),
-                            protocol: ping_options.method,
+                            protocol: ConnectMethod::Dns,
                             source: src_ip_port.ipv4.to_string(),
                             destination: dst_socket.to_string(),
                             time: -1.0,
@@ -247,7 +247,7 @@ async fn connect_host(
     if local_socket.is_none() {
         return Ok(ConnectRecord {
             result: ConnectResult::Error(ConnectError::BindError),
-            protocol: ping_options.method,
+            protocol: ConnectMethod::Dns,
             source: bind_addr.to_string(),
             destination: dst_socket.to_string(),
             time: -1.0,
@@ -280,7 +280,7 @@ async fn connect_host(
 
     let mut conn_record = ConnectRecord {
         result: ConnectResult::Error(ConnectError::Unknown),
-        protocol: ping_options.method,
+        protocol: ConnectMethod::Dns,
         source: bind_addr.to_string(),
         destination: dst_socket.to_string(),
         time: -1.0,

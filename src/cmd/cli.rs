@@ -2,16 +2,16 @@ use std::net::IpAddr;
 
 use anyhow::Result;
 use clap::{Args, Parser, Subcommand};
+use tracing_appender::rolling;
 
 use crate::core::common::{
-    ConnectMethod, HttpScheme, HttpVersion, IpOptions, IpProtocol, ListenOptions, LoggingOptions, PingOptions,
-    Transport,
+    HttpScheme, HttpVersion, IpOptions, IpProtocol, ListenOptions, LoggingOptions, PingOptions, Transport,
 };
 use crate::core::config::Config;
 use crate::core::konst::{
-    BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CLI_HEADER_MSG, CONFIG_FILE, CURRENT_DIR, DNS_LOOKUP_DOMAIN, DNS_PORT,
-    HTTPS_PORT, HTTP_PORT, LOGFILE_NAME, LOGGING_JSON, LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL, PING_NK_PEER,
-    PING_REPEAT, PING_TIMEOUT,
+    APP_NAME, BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CLI_HEADER_MSG, CONFIG_FILE, CURRENT_DIR, DNS_LOOKUP_DOMAIN,
+    DNS_PORT, HTTP_PORT, HTTPS_PORT, LOGFILE_NAME, LOGGING_JSON, LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL,
+    PING_NK_PEER, PING_REPEAT, PING_TIMEOUT,
 };
 use crate::dns::client::{DnsClient, DnsClientOptions};
 use crate::http::client::{HttpClient, HttpClientOptions};
@@ -248,6 +248,20 @@ impl Cli {
             Command::Udp { ref shared_options, .. } => shared_options.clone(),
         };
 
+        let file_appender = rolling::never(&shared_options.dir, &shared_options.file);
+        let (logfile, _guard) = tracing_appender::non_blocking(file_appender);
+
+        let tracer = tracing_subscriber::fmt()
+            .with_env_filter(std::env::var("NK_LOG").unwrap_or_else(|_| format!("{APP_NAME}=info")))
+            .with_writer(logfile)
+            .with_ansi(false);
+
+        if shared_options.json {
+            tracer.json().init()
+        } else {
+            tracer.init()
+        }
+
         let config = match Config::load(&shared_options.config) {
             Ok(config) => {
                 println!("Using configuration file `{}`.\n", shared_options.config);
@@ -275,12 +289,11 @@ impl Cli {
         // the option was set from the CLI. Therefore we should
         // use the CLI option. Otherwise use the config file option.
         #[rustfmt::skip]
-        let mut ping_options = PingOptions {
+        let ping_options = PingOptions {
             repeat: if shared_options.repeat != PING_REPEAT { shared_options.repeat } else { config.ping_options.repeat },
             interval: if shared_options.interval != PING_INTERVAL { shared_options.interval } else { config.ping_options.interval },
             timeout: if shared_options.timeout != PING_TIMEOUT { shared_options.timeout } else { config.ping_options.timeout },
             nk_peer: if shared_options.nk_peer != PING_NK_PEER { shared_options.nk_peer } else { config.ping_options.nk_peer },
-            method: ConnectMethod::default(),
         };
 
         #[rustfmt::skip]
@@ -326,8 +339,6 @@ impl Cli {
                 transport,
                 shared_options,
             } => {
-                ping_options.method = ConnectMethod::Dns;
-
                 let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
 
                 let dns_client_options = DnsClientOptions {
@@ -353,8 +364,6 @@ impl Cli {
                 version,
                 shared_options,
             } => {
-                ping_options.method = ConnectMethod::Http;
-
                 let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
 
                 let http_client_options = HttpClientOptions {
@@ -380,8 +389,6 @@ impl Cli {
                 version,
                 shared_options,
             } => {
-                ping_options.method = ConnectMethod::Https;
-
                 let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
 
                 let http_client_options = HttpClientOptions {
@@ -406,8 +413,6 @@ impl Cli {
                 remote_port,
                 shared_options,
             } => {
-                ping_options.method = ConnectMethod::Tcp;
-
                 let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
 
                 let tcp_client_options = TcpClientOptions {
@@ -440,8 +445,6 @@ impl Cli {
                 remote_port,
                 shared_options,
             } => {
-                ping_options.method = ConnectMethod::Udp;
-
                 let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
 
                 let udp_client_options = UdpClientOptions {

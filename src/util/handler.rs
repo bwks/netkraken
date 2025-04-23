@@ -1,6 +1,6 @@
-use tokio::time::{sleep, Duration};
-use tracing::event;
+use tokio::time::{Duration, sleep};
 use tracing::Level;
+use tracing::event;
 
 use crate::core::common::LogLevel;
 use crate::core::common::LoggingOptions;
