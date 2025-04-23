@@ -1,13 +1,12 @@
 use std::net::{IpAddr, SocketAddr};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use futures::StreamExt;
 use hyper_util::client::legacy::connect::HttpInfo;
-use reqwest::header::HeaderMap;
 use reqwest::Client;
-// use reqwest::StatusCode;
+use reqwest::header::HeaderMap;
 use tokio::signal;
 use tokio::time::Duration;
 

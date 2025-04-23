@@ -228,7 +228,6 @@ pub struct PingOptions {
     pub interval: u16,
     pub timeout: u16,
     pub nk_peer: bool,
-    pub method: ConnectMethod,
 }
 
 impl Default for PingOptions {
@@ -238,7 +237,6 @@ impl Default for PingOptions {
             interval: PING_INTERVAL,
             timeout: PING_TIMEOUT,
             nk_peer: PING_NK_PEER,
-            method: ConnectMethod::default(),
         }
     }
 }

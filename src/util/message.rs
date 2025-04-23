@@ -1,8 +1,8 @@
 use std::net::{IpAddr, SocketAddr};
 
-use tabled::settings::Panel;
-use tabled::settings::{object::Rows, Alignment, Margin, Modify, Span, Style};
 use tabled::Table;
+use tabled::settings::Panel;
+use tabled::settings::{Alignment, Margin, Modify, Span, Style, object::Rows};
 
 use crate::core::common::{ClientResult, ConnectMethod, ConnectRecord, ConnectResult, HostRecord};
 use crate::core::konst::ARROW;

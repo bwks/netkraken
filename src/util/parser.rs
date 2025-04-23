@@ -1,6 +1,6 @@
 use std::net::IpAddr;
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 
 use crate::core::common::NetKrakenMessage;
 
