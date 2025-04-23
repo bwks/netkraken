@@ -1132,7 +1132,7 @@ dependencies = [
 
 [[package]]
 name = "netkraken"
-version = "0.2.8"
+version = "0.2.9"
 dependencies = [
  "anyhow",
  "clap",
@@ -1145,6 +1145,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
+ "socket2",
  "tabled",
  "tokio",
  "tokio-stream",
