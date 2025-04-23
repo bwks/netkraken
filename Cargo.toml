@@ -1,7 +1,7 @@
 [package]
 name = "netkraken"
-version = "0.2.6"
-edition = "2021"
+version = "0.2.7"
+edition = "2024"
 
 [[bin]]
 name = "nk"
@@ -40,8 +40,13 @@ reqwest = { version = "0.12.15", features = ["json", "rustls-tls"] }
 # DNS Client
 hickory-resolver = "0.25.1"
 
+# Tracing
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "json"] }
 tracing-appender = "0.2.3"
-time = "0.3.41"
+
+# What's the time Mr Wolf
+jiff = "0.2.10"
+
+# Unique IDs
 uuid = { version = "1.16.0", features = ["v4", "fast-rng"] }
