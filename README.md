@@ -14,6 +14,7 @@ of the world.
  - TCP/UDP Client/Server
  - HTTP Client
  - DNS Client
+ - ICMP Client
  - Asynchronous servers allowing for large amounts of client connections
  - Asynchronous clients allow for simultaneous connections to multiple destinations
 
@@ -36,7 +37,8 @@ Commands:
   config  Generate a NetKraken config
   dns     DNS connection
   http    HTTP connection
-  https   HTTP connection
+  https   HTTPS connection
+  icmp    ICMP ping
   tcp     TCP connection
   udp     UDP connection
   help    Print this message or the help of the given subcommand(s)
@@ -44,6 +46,30 @@ Commands:
 Options:
   -h, --help     Print help
   -V, --version  Print version
+```
+
+## Troubleshooting
+
+### ICMP
+On linux, the ICMP client needs to either run as `sudo` or, the `nk` binary
+needs `cap_net_raw` permissions, which allows it create raw sockets.
+
+This will allow regular users
+to use the ICMP client without using sudo.
+```
+sudo setcap cap_net_raw=ep /path/to/nk
+```
+- `cap_net_raw` - The capability that allows sending raw network packets.
+- `ep` - The capability is in the effective and permitted sets.
+
+If not, you will get the following error:
+```
+Operation not permitted (os error 1)
+```
+
+You can check the current permissions with the following command:
+```
+getcap /path/to/nk
 ```
 
 ## Testing
@@ -57,15 +83,4 @@ ncat -l -k -v 127.0.0.1 8080 --sh-exec "echo ''"
 ### UDP Server
 ```
 ncat -l -u -k -v 127.0.0.1 8080 --sh-exec "echo ''"
-```
-
-
-### ICMP
-
-```
-Operation not permitted (os error 1)
-```
-
-```
-sudo setcap cap_net_bind_service,cap_net_admin,cap_net_raw+eip ./target/debug/nk
 ```
