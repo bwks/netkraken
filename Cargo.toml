@@ -1,6 +1,6 @@
 [package]
 name = "netkraken"
-version = "0.2.10"
+version = "0.2.11"
 edition = "2024"
 
 [[bin]]
@@ -10,6 +10,9 @@ path = "src/main.rs"
 [dependencies]
 # Errors
 anyhow = "1.0.97"
+
+# Data consumption
+# bytes = "1.10.1"
 
 # CLI
 clap = { version = "4.5.35", features = ["derive"] }

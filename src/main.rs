@@ -31,7 +31,7 @@ async fn main() -> ExitCode {
                     event!(target: APP_NAME, Level::ERROR, "{e}")
                 }
             }
-            ExitCode::from(1)
+            ExitCode::from(0)
         }
     }
 }

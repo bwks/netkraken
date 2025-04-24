@@ -129,7 +129,7 @@ impl std::fmt::Display for HttpScheme {
     }
 }
 
-#[derive(Debug, Default, Clone, ValueEnum, PartialEq, Deserialize)]
+#[derive(Debug, Default, Clone, Copy, ValueEnum, PartialEq, Deserialize)]
 pub enum HttpVersion {
     #[default]
     #[value(name = "1")]
