@@ -240,7 +240,6 @@ async fn connect_host(
     client_options: HttpClientOptions,
     ping_options: PingOptions,
 ) -> Result<ConnectRecord> {
-    println!("HERE");
     let (bind_addr, src_socket) = match &dst_socket.is_ipv4() {
         // Bind the source socket to the same IP Version as the destination socket.
         true => {
@@ -345,11 +344,11 @@ async fn connect_host(
             conn_record.time = connection_time;
             conn_record.result = ConnectResult::Success(ConnectSuccess::Ok);
 
-            let local_ip = response.extensions().get::<HttpInfo>().map(|info| info.local_addr());
-            if local_ip.is_some() {
-                // This will always be some
-                conn_record.source = local_ip.unwrap().to_string()
+            // Extract the local IP address from the response if available
+            if let Some(info) = response.extensions().get::<HttpInfo>() {
+                conn_record.source = info.local_addr().to_string();
             }
+
             debug!(
                 "Connection successful: status={}, protocol={:?}",
                 response.status(),
