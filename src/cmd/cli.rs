@@ -98,6 +98,10 @@ pub enum Command {
         #[clap(short = 'V', long, default_value_t = HttpVersion::default(), display_order = 51)]
         version: HttpVersion,
 
+        /// Allow insecure connections ** Danger Will Robinson, be sure you understand the implications **
+        #[clap(long, default_value_t = false, display_order = 52)]
+        allow_insecure: bool,
+
         #[clap(flatten)]
         shared_options: SharedOptions,
     },
@@ -387,6 +391,7 @@ impl Cli {
                     local_port,
                     scheme: HttpScheme::Http,
                     version,
+                    allow_insecure: false,
                 };
                 let http_client = HttpClient {
                     client_options: http_client_options,
@@ -400,6 +405,7 @@ impl Cli {
                 remote_host,
                 remote_port,
                 version,
+                allow_insecure,
                 shared_options,
             } => {
                 let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
@@ -412,6 +418,7 @@ impl Cli {
                     local_port,
                     scheme: HttpScheme::Https,
                     version,
+                    allow_insecure,
                 };
                 let http_client = HttpClient {
                     client_options: http_client_options,

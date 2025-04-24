@@ -9,6 +9,7 @@ use reqwest::Client;
 use reqwest::header::HeaderMap;
 use tokio::signal;
 use tokio::time::Duration;
+use tracing::debug;
 
 use crate::core::common::{
     ClientResult, ClientSummary, ConnectError, ConnectMethod, ConnectRecord, ConnectResult, ConnectSuccess, HostRecord,
@@ -31,6 +32,7 @@ pub struct HttpClientOptions {
     pub local_port: u16,
     pub scheme: HttpScheme,
     pub version: HttpVersion,
+    pub allow_insecure: bool,
 }
 
 #[derive(Debug)]
@@ -238,6 +240,7 @@ async fn connect_host(
     client_options: HttpClientOptions,
     ping_options: PingOptions,
 ) -> Result<ConnectRecord> {
+    println!("HERE");
     let (bind_addr, src_socket) = match &dst_socket.is_ipv4() {
         // Bind the source socket to the same IP Version as the destination socket.
         true => {
@@ -284,18 +287,37 @@ async fn connect_host(
                 .build()?
         }
         HttpScheme::Https => {
-            Client::builder()
+            let client = Client::builder()
                 .default_headers(headers)
-                .danger_accept_invalid_certs(true)
-                .danger_accept_invalid_hostnames(true)
                 .tls_built_in_root_certs(true) // Use system root certificates
                 .use_rustls_tls() // Use rustls instead of native-tls
                 .tls_sni(true)
                 .redirect(reqwest::redirect::Policy::limited(10))
-                .resolve(&host_record.host, dst_socket) // Bypass DNS resolution as we have already resoloved the IP
+                .resolve(&host_record.host, dst_socket) // Bypass DNS resolution as we have already resolved the IP
                 .timeout(Duration::from_millis(ping_options.timeout as u64))
-                .local_address(bind_addr.ip())
-                .build()?
+                .local_address(bind_addr.ip());
+
+            let client = match client_options.version {
+                HttpVersion::V1 => client.http1_only(),
+                HttpVersion::V2 => client
+                    .http2_prior_knowledge()
+                    .http2_initial_stream_window_size(1024 * 1024)
+                    .http2_initial_connection_window_size(1024 * 1024)
+                    .http2_keep_alive_interval(Some(Duration::from_millis(100)))
+                    .http2_keep_alive_timeout(Duration::from_millis(ping_options.timeout as u64)),
+                _ => client,
+            };
+
+            // Handle insecure certificates if allowed
+            let client = if client_options.allow_insecure {
+                client
+                    .danger_accept_invalid_certs(true)
+                    .danger_accept_invalid_hostnames(true)
+            } else {
+                client
+            };
+
+            client.build()?
         }
     };
 
@@ -312,7 +334,8 @@ async fn connect_host(
     // record timestamp before connection
     let pre_conn_timestamp = time_now_us();
 
-    let url = format!("{}://{}", client_options.scheme, host_record.host);
+    let url = format!("{}://{}:{}", client_options.scheme, host_record.host, host_record.port);
+    debug!("Connecting to URL: {}", url);
 
     match http_client.get(url.clone()).send().await {
         Ok(response) => {
@@ -327,6 +350,23 @@ async fn connect_host(
                 // This will always be some
                 conn_record.source = local_ip.unwrap().to_string()
             }
+            debug!(
+                "Connection successful: status={}, protocol={:?}",
+                response.status(),
+                response.version()
+            );
+
+            // Log details about TLS if available
+            if let Some(info) = response.extensions().get::<HttpInfo>() {
+                debug!(
+                    "Connection details: local={}, remote={}",
+                    info.local_addr(),
+                    info.remote_addr()
+                );
+            }
+            // Explicitly drop the response after recording the success
+            // to avoid the need to consume the body
+            drop(response);
         }
         Err(e) => {
             // We got a redirection from http to https we could end up in the error case as
@@ -342,10 +382,13 @@ async fn connect_host(
                 conn_record.error_msg = Some(e.to_string());
                 if e.is_timeout() {
                     conn_record.result = ConnectResult::Error(ConnectError::Timeout);
+                    debug!("Timeout Error: {}: {}", url, e)
                 } else if e.is_connect() {
                     conn_record.result = ConnectResult::Error(ConnectError::ConnectionError);
+                    debug!("Connection Error {}: {}", url, e)
                 } else {
                     conn_record.result = ConnectResult::Error(ConnectError::Error);
+                    debug!("Unknown Error {}: {}", url, e)
                 }
             }
         }

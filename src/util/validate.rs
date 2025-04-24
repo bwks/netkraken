@@ -36,7 +36,7 @@ pub fn validate_local_ip(src_ip: &IpAddr) -> Result<()> {
         }
     }
 
-    bail!("source address: `{}` is not a local address", src_ip)
+    bail!("Source address: `{}` is not a local address", src_ip)
 }
 
 #[cfg(test)]
