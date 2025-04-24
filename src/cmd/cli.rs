@@ -15,6 +15,7 @@ use crate::core::konst::{
 };
 use crate::dns::client::{DnsClient, DnsClientOptions};
 use crate::http::client::{HttpClient, HttpClientOptions};
+use crate::icmp::client::{IcmpClient, IcmpClientOptions};
 use crate::tcp::client::{TcpClient, TcpClientOptions};
 use crate::tcp::server::TcpServer;
 use crate::udp::client::{UdpClient, UdpClientOptions};
@@ -96,6 +97,16 @@ pub enum Command {
         /// HTTP Version
         #[clap(short = 'V', long, default_value_t = HttpVersion::default(), display_order = 51)]
         version: HttpVersion,
+
+        #[clap(flatten)]
+        shared_options: SharedOptions,
+    },
+
+    /// ICMP ping
+    Icmp {
+        /// Remote host
+        #[clap(short = 'H', long, display_order = 1)]
+        remote_host: String,
 
         #[clap(flatten)]
         shared_options: SharedOptions,
@@ -244,6 +255,7 @@ impl Cli {
             Command::Dns { ref shared_options, .. } => shared_options.clone(),
             Command::Http { ref shared_options, .. } => shared_options.clone(),
             Command::Https { ref shared_options, .. } => shared_options.clone(),
+            Command::Icmp { ref shared_options, .. } => shared_options.clone(),
             Command::Tcp { ref shared_options, .. } => shared_options.clone(),
             Command::Udp { ref shared_options, .. } => shared_options.clone(),
         };
@@ -407,6 +419,25 @@ impl Cli {
                     ip_options,
                 };
                 http_client.connect().await?;
+            }
+            Command::Icmp {
+                remote_host,
+                shared_options,
+            } => {
+                let (local_ipv4, local_ipv6, _local_port) = get_local_params(&shared_options)?;
+
+                let icmp_client_options = IcmpClientOptions {
+                    remote_host,
+                    local_ipv4,
+                    local_ipv6,
+                };
+                let icmp_client = IcmpClient {
+                    client_options: icmp_client_options,
+                    logging_options,
+                    ping_options,
+                    ip_options,
+                };
+                icmp_client.connect().await?;
             }
             Command::Tcp {
                 remote_host,

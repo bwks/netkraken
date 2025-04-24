@@ -96,9 +96,9 @@ pub enum ConnectMethod {
     Udp,
 
     Dns,
-    // ICMP,
     Http,
     Https,
+    Icmp,
 }
 
 impl Display for ConnectMethod {
@@ -106,10 +106,10 @@ impl Display for ConnectMethod {
         match self {
             ConnectMethod::Tcp => write!(f, "tcp"),
             ConnectMethod::Udp => write!(f, "udp"),
-            // ConnectMethod::ICMP => write!(f, "icmp"),
             ConnectMethod::Dns => write!(f, "dns"),
             ConnectMethod::Http => write!(f, "http"),
             ConnectMethod::Https => write!(f, "https"),
+            ConnectMethod::Icmp => write!(f, "icmp"),
         }
     }
 }

@@ -2,6 +2,7 @@ mod cmd;
 mod core;
 mod dns;
 mod http;
+mod icmp;
 mod tcp;
 mod udp;
 mod util;
