@@ -8,12 +8,15 @@ use futures::StreamExt;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::signal;
 use tokio::time::Duration;
+use tracing::debug;
 
 use crate::core::common::{
     ClientResult, ClientSummary, ConnectError, ConnectMethod, ConnectRecord, ConnectResult, ConnectSuccess, HostRecord,
     HostResults, IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions,
 };
-use crate::core::konst::{BUFFER_SIZE, ICMP_PORT};
+use crate::core::konst::{
+    BUFFER_SIZE, ICMP_PORT, ICMPV4_ECHO_REPLY, ICMPV4_ECHO_REQUEST, ICMPV6_ECHO_REPLY, ICMPV6_ECHO_REQUEST,
+};
 use crate::util::dns::resolve_host;
 use crate::util::handler::{log_handler2, loop_handler};
 use crate::util::message::{client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg};
@@ -208,7 +211,7 @@ async fn connect_host(
         }
         false => {
             let bind_ipv6_addr = SocketAddr::new(src.ipv6, src.port);
-            let socket = Socket::new(Domain::IPV6, Type::RAW, Some(Protocol::ICMPV4)).ok();
+            let socket = Socket::new(Domain::IPV6, Type::RAW, Some(Protocol::ICMPV6)).ok();
             (bind_ipv6_addr, socket)
         }
     };
@@ -253,7 +256,7 @@ async fn connect_host(
 
     let identifier = (std::process::id() % u16::MAX as u32) as u16;
 
-    let packet = build_icmp_echo(identifier, send_count);
+    let packet = build_icmp_echo(identifier, send_count, dst_socket.is_ipv6());
 
     match src_socket.send_to(&packet, &dst_socket.into()) {
         Ok(_) => {}
@@ -280,6 +283,9 @@ async fn connect_host(
                 conn_record.success = true;
                 conn_record.result = ConnectResult::Success(ConnectSuccess::Ok);
                 conn_record.time = connection_time;
+            } else {
+                conn_record.result = ConnectResult::Error(ConnectError::Error);
+                conn_record.error_msg = Some("Error parsing icmp reply".to_owned());
             }
         }
         Err(e) => {
@@ -291,10 +297,11 @@ async fn connect_host(
     conn_record
 }
 
-fn build_icmp_echo(identifier: u16, seq: u16) -> Vec<u8> {
+fn build_icmp_echo(identifier: u16, seq: u16, is_ipv6: bool) -> Vec<u8> {
     let mut packet = vec![
-        8, // Type=8 (Echo Request)
-        0, // Code=0
+        // 8, // Type=8 (Echo Request)
+        if is_ipv6 { ICMPV6_ECHO_REQUEST } else { ICMPV4_ECHO_REQUEST }, // Type=8 (ICMPv4 Echo Request) or 128 (ICMPv6 Echo Request)
+        0,                                                               // Code=0
         0,
         0, // Checksum (placeholder)
         (identifier >> 8) as u8,
@@ -315,29 +322,62 @@ fn parse_icmp_reply(packet: &[u8], identifier: u16, seq: u16, is_loopback: bool)
         return false;
     }
 
-    // Skip the IP header (the first byte is the version and IHL)
-    let ip_header_length = (packet[0] & 0x0F) * 4; // IHL gives length in 4-byte words
+    // Check if we're dealing with a packet that includes IP header or just ICMP data
+    let icmp_data: &[u8];
 
-    // Check if we have enough data for the IP header
-    if packet.len() < ip_header_length as usize {
+    // Get the version from the first byte's high nibble
+    let apparent_version = (packet[0] >> 4) & 0x0F;
+
+    if apparent_version == 4 {
+        // This is likely an IPv4 packet with header
+        let ip_header_length = (packet[0] & 0x0F) * 4;
+        if packet.len() < ip_header_length as usize {
+            return false;
+        }
+        icmp_data = &packet[ip_header_length as usize..];
+
+        debug!("Processing as IPv4 packet with IP header. ICMP type: {}", icmp_data[0]);
+    } else if apparent_version == 6 {
+        // This is likely an IPv6 packet with header (though rare with raw sockets)
+        if packet.len() < 40 {
+            // IPv6 header is fixed 40 bytes
+            return false;
+        }
+        icmp_data = &packet[40..];
+
+        debug!("Processing as IPv6 packet with IP header. ICMP type: {}", icmp_data[0]);
+    } else if apparent_version == 8 || packet[0] == ICMPV6_ECHO_REPLY {
+        // This might be an ICMPv6 packet delivered without IP header
+        // Version "8" is actually the high nibble of ICMPv6 type 128 (Echo Request)
+        // or we're seeing 129 (Echo Reply)
+        icmp_data = packet; // The packet starts with ICMPv6 header
+
+        debug!(
+            "Processing as raw ICMPv6 packet (no IP header). ICMP type: {}",
+            icmp_data[0]
+        );
+    } else {
+        // Unrecognized format
+        // println!("Unrecognized packet format. First byte: {}", packet[0]);
         return false;
     }
-
-    // ICMP data starts after the IP header
-    let icmp_data = &packet[ip_header_length as usize..];
 
     // Now check the ICMP header
     let icmp_types = if is_loopback {
         // We are looking for the ICMP types:
-        // 0 - Echo Reply
-        // 8 - Echo Request
+        //  - 0/129 - Echo Reply (ipv4/ipv6)
+        //  - 8/128 - Echo Request (ipv4/ipv6)
         // When pinging a loopback, sometimes we get the Echo Request type reflected back,
-        // so we need to check for both Type 0 and 8 when pinging a loopback.
-        icmp_data[0] == 0 || icmp_data[0] == 8
+        // so we need to check for both Type 0/128 and 8/129 when pinging a loopback.
+        icmp_data[0] == ICMPV4_ECHO_REPLY
+            || icmp_data[0] == ICMPV4_ECHO_REQUEST
+            || icmp_data[0] == ICMPV6_ECHO_REPLY
+            || icmp_data[0] == ICMPV6_ECHO_REQUEST
     } else {
         // Otherwise if it's a remote host, only look for Echo reply
-        icmp_data[0] == 0
+        icmp_data[0] == ICMPV4_ECHO_REPLY || icmp_data[0] == ICMPV6_ECHO_REPLY
     };
+
     icmp_data.len() >= 8
         && icmp_types // Echo Reply type
         && icmp_data[1] == 0  // Code
