@@ -15,10 +15,16 @@ pub const PING_REPEAT: u16 = 4;
 pub const PING_TIMEOUT: u16 = 3000;
 pub const PING_INTERVAL: u16 = 1000;
 pub const PING_NK_PEER: bool = false;
-pub const ICMP_PORT: u16 = 0;
 pub const CLI_HEADER_MSG: &str = "NetKraken - Cross platform network connectivity tester\n";
 pub const DNS_LOOKUP_DOMAIN: &str = "www.microsoft.com";
 pub const DNS_PORT: u16 = 53;
 pub const HTTP_PORT: u16 = 80;
 pub const HTTPS_PORT: u16 = 443;
 pub const ARROW: &str = "->";
+
+// ICMP
+pub const ICMP_PORT: u16 = 0;
+pub const ICMPV4_ECHO_REQUEST: u8 = 8;
+pub const ICMPV4_ECHO_REPLY: u8 = 0;
+pub const ICMPV6_ECHO_REQUEST: u8 = 128;
+pub const ICMPV6_ECHO_REPLY: u8 = 129;

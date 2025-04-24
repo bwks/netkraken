@@ -38,7 +38,7 @@ Commands:
   dns     DNS connection
   http    HTTP connection
   https   HTTPS connection
-  icmp    ICMP ping
+  icmp    ICMP connection
   tcp     TCP connection
   udp     UDP connection
   help    Print this message or the help of the given subcommand(s)

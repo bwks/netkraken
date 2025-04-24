@@ -102,7 +102,7 @@ pub enum Command {
         shared_options: SharedOptions,
     },
 
-    /// ICMP ping
+    /// ICMP connection
     Icmp {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
@@ -266,7 +266,8 @@ impl Cli {
         let tracer = tracing_subscriber::fmt()
             .with_env_filter(std::env::var("NK_LOG").unwrap_or_else(|_| format!("{APP_NAME}=info")))
             .with_writer(logfile)
-            .with_ansi(false);
+            .with_ansi(false)
+            .with_target(true);
 
         if shared_options.json {
             tracer.json().init()
