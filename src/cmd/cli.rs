@@ -15,7 +15,7 @@ use crate::core::konst::{
 };
 use crate::dns::client::{DnsClient, DnsClientOptions};
 use crate::http::client::{HttpClient, HttpClientOptions};
-use crate::icmp::ping::{IcmpClient, IcmpClientOptions};
+use crate::icmp::client::{IcmpClient, IcmpClientOptions};
 use crate::tcp::client::{TcpClient, TcpClientOptions};
 use crate::tcp::server::TcpServer;
 use crate::udp::client::{UdpClient, UdpClientOptions};

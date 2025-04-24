@@ -2,7 +2,6 @@ use std::mem::MaybeUninit;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-// use std::time::{Duration, Instant};
 
 use anyhow::{Result, bail};
 use futures::StreamExt;
@@ -197,6 +196,9 @@ async fn connect_host(
     dst_socket: SocketAddr,
     ping_options: PingOptions,
 ) -> ConnectRecord {
+    // For loopback address, use a special handling
+    let is_loopback = dst_socket.ip().is_loopback();
+
     let (bind_addr, src_socket) = match &dst_socket.is_ipv4() {
         // Bind the source socket to the same IP Version as the destination socket.
         true => {
@@ -211,12 +213,14 @@ async fn connect_host(
         }
     };
 
+    let local_addr = bind_addr.to_string();
+
     // If the source socket is None, we could not bind to the socket.
     if src_socket.is_none() {
         return ConnectRecord {
             result: ConnectResult::Error(ConnectError::BindError),
             protocol: ConnectMethod::Icmp,
-            source: bind_addr.to_string(),
+            source: local_addr,
             destination: dst_socket.to_string(),
             time: -1.0,
             success: false,
@@ -225,8 +229,6 @@ async fn connect_host(
     }
     // Unwrap the socket because we have already checked that it is not None.
     let src_socket = src_socket.unwrap();
-
-    let local_addr = bind_addr.to_string();
 
     let mut conn_record = ConnectRecord {
         result: ConnectResult::Error(ConnectError::Unknown),
@@ -241,9 +243,13 @@ async fn connect_host(
     // record timestamp before connection
     let pre_conn_timestamp = time_now_us();
 
-    src_socket
+    if src_socket
         .set_read_timeout(Some(Duration::from_millis(ping_options.timeout as u64)))
-        .unwrap();
+        .is_err()
+    {
+        conn_record.error_msg = Some("Error setting read timeout.".to_owned());
+        return conn_record;
+    }
 
     let identifier = (std::process::id() % u16::MAX as u32) as u16;
 
@@ -270,11 +276,8 @@ async fn connect_host(
             //  - We only access buf[..n] on successful recieve.
             let received_data = buf[..n].iter().map(|b| unsafe { b.assume_init() }).collect::<Vec<u8>>();
 
-            if parse_icmp_reply(&received_data, identifier, send_count) {
+            if parse_icmp_reply(&received_data, identifier, send_count, is_loopback) {
                 conn_record.success = true;
-                conn_record.source = local_addr;
-
-                // conn_record.source = src_socket.local_addr().unwrap().as_socket().unwrap().to_string();
                 conn_record.result = ConnectResult::Success(ConnectSuccess::Ok);
                 conn_record.time = connection_time;
             }
@@ -306,7 +309,7 @@ fn build_icmp_echo(identifier: u16, seq: u16) -> Vec<u8> {
     packet
 }
 
-fn parse_icmp_reply(packet: &[u8], identifier: u16, seq: u16) -> bool {
+fn parse_icmp_reply(packet: &[u8], identifier: u16, seq: u16, is_loopback: bool) -> bool {
     // Make sure we have at least one byte for the IP header
     if packet.is_empty() {
         return false;
@@ -324,8 +327,19 @@ fn parse_icmp_reply(packet: &[u8], identifier: u16, seq: u16) -> bool {
     let icmp_data = &packet[ip_header_length as usize..];
 
     // Now check the ICMP header
+    let icmp_types = if is_loopback {
+        // We are looking for the ICMP types:
+        // 0 - Echo Reply
+        // 8 - Echo Request
+        // When pinging a loopback, sometimes we get the Echo Request type reflected back,
+        // so we need to check for both Type 0 and 8 when pinging a loopback.
+        icmp_data[0] == 0 || icmp_data[0] == 8
+    } else {
+        // Otherwise if it's a remote host, only look for Echo reply
+        icmp_data[0] == 0
+    };
     icmp_data.len() >= 8
-        && icmp_data[0] == 0  // Echo Reply type
+        && icmp_types // Echo Reply type
         && icmp_data[1] == 0  // Code
         && u16::from_be_bytes([icmp_data[4], icmp_data[5]]) == identifier
         && u16::from_be_bytes([icmp_data[6], icmp_data[7]]) == seq
