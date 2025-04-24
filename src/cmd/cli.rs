@@ -15,7 +15,7 @@ use crate::core::konst::{
 };
 use crate::dns::client::{DnsClient, DnsClientOptions};
 use crate::http::client::{HttpClient, HttpClientOptions};
-use crate::icmp::ping::ping;
+use crate::icmp::ping::{IcmpClient, IcmpClientOptions};
 use crate::tcp::client::{TcpClient, TcpClientOptions};
 use crate::tcp::server::TcpServer;
 use crate::udp::client::{UdpClient, UdpClientOptions};
@@ -423,7 +423,22 @@ impl Cli {
             Command::Icmp {
                 remote_host,
                 shared_options,
-            } => ping(&remote_host, shared_options.repeat as usize)?,
+            } => {
+                let (local_ipv4, local_ipv6, _local_port) = get_local_params(&shared_options)?;
+
+                let icmp_client_options = IcmpClientOptions {
+                    remote_host,
+                    local_ipv4,
+                    local_ipv6,
+                };
+                let icmp_client = IcmpClient {
+                    client_options: icmp_client_options,
+                    logging_options,
+                    ping_options,
+                    ip_options,
+                };
+                icmp_client.connect().await?;
+            }
             Command::Tcp {
                 remote_host,
                 remote_port,

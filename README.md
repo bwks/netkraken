@@ -1,6 +1,6 @@
 # NetKraken
 
-NetKraken is a Network connectivity tester inspired by `nc`, `ncat` and the `netcat`s 
+NetKraken is a Network connectivity tester inspired by `nc`, `ncat` and the `netcat`s
 of the world.
 
 > # 🚧 work in progress 🚧
@@ -57,4 +57,15 @@ ncat -l -k -v 127.0.0.1 8080 --sh-exec "echo ''"
 ### UDP Server
 ```
 ncat -l -u -k -v 127.0.0.1 8080 --sh-exec "echo ''"
+```
+
+
+### ICMP
+
+```
+Operation not permitted (os error 1)
+```
+
+```
+sudo setcap cap_net_bind_service,cap_net_admin,cap_net_raw+eip ./target/debug/nk
 ```
