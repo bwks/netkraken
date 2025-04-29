@@ -15,7 +15,7 @@ use crate::core::common::{
     ClientResult, ClientSummary, ConnectError, ConnectMethod, ConnectRecord, ConnectResult, ConnectSuccess, HostRecord,
     HostResults, HttpScheme, HttpVersion, IpOptions, IpPort, IpProtocol, LoggingOptions, PingOptions,
 };
-use crate::core::konst::BUFFER_SIZE;
+use crate::core::konst::{BUFFER_SIZE, NK_VERSION};
 use crate::util::dns::resolve_host;
 use crate::util::handler::{log_handler2, loop_handler};
 use crate::util::message::{client_result_msg, client_summary_table_msg, ping_header_msg, resolved_ips_msg};
@@ -256,8 +256,6 @@ async fn connect_host(
 
     let protocol = get_connect_method(&client_options.scheme);
 
-    let _version = client_options.version;
-
     // If the source socket is None, we could not bind to the socket.
     if src_socket.is_none() {
         return Ok(ConnectRecord {
@@ -272,8 +270,13 @@ async fn connect_host(
     }
 
     let mut headers = HeaderMap::new();
-    headers.insert("x-custom-header", "netkraken".parse().unwrap());
-    headers.insert("connection", "close".parse().unwrap());
+    // These should never fail.
+    headers.insert("user-agent", format!("netkraken/{NK_VERSION}").parse().unwrap());
+    headers.insert("connection", "keep-alive".parse().unwrap());
+    headers.insert(
+        "host",
+        format!("{}:{}", host_record.host, host_record.port).parse().unwrap(),
+    );
 
     let http_client = match client_options.scheme {
         HttpScheme::Http => {

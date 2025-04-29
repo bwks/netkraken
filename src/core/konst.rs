@@ -28,3 +28,4 @@ pub const ICMPV4_ECHO_REQUEST: u8 = 8;
 pub const ICMPV4_ECHO_REPLY: u8 = 0;
 pub const ICMPV6_ECHO_REQUEST: u8 = 128;
 pub const ICMPV6_ECHO_REPLY: u8 = 129;
+pub const NK_VERSION: &str = env!("CARGO_PKG_VERSION");
