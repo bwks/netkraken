@@ -271,6 +271,7 @@ async fn connect_host(
 
     let mut headers = HeaderMap::new();
     // These should never fail.
+    headers.insert("accept", "*/*".parse().unwrap());
     headers.insert("user-agent", format!("netkraken/{NK_VERSION}").parse().unwrap());
     headers.insert("connection", "keep-alive".parse().unwrap());
     headers.insert(
