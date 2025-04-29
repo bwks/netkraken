@@ -5,8 +5,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use anyhow::{Result, bail};
 use futures::StreamExt;
 use hyper_util::client::legacy::connect::HttpInfo;
-use reqwest::Client;
 use reqwest::header::HeaderMap;
+use reqwest::{Client, header};
 use tokio::signal;
 use tokio::time::Duration;
 use tracing::debug;
@@ -271,11 +271,11 @@ async fn connect_host(
 
     let mut headers = HeaderMap::new();
     // These should never fail.
-    headers.insert("accept", "*/*".parse().unwrap());
-    headers.insert("user-agent", format!("netkraken/{NK_VERSION}").parse().unwrap());
-    headers.insert("connection", "keep-alive".parse().unwrap());
+    headers.insert(header::ACCEPT, "*/*".parse().unwrap());
+    headers.insert(header::USER_AGENT, format!("netkraken/{NK_VERSION}").parse().unwrap());
+    headers.insert(header::CONNECTION, "keep-alive".parse().unwrap());
     headers.insert(
-        "host",
+        header::HOST,
         format!("{}:{}", host_record.host, host_record.port).parse().unwrap(),
     );
 
