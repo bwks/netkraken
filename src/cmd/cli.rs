@@ -119,12 +119,24 @@ pub enum Command {
     /// TCP connection
     Tcp {
         /// Remote host
-        #[clap(short = 'H', long, display_order = 1)]
-        remote_host: String,
+        #[clap(
+            short = 'H',
+            long,
+            display_order = 1,
+            required = false,
+            required_unless_present = "listen"
+        )]
+        remote_host: Option<String>,
 
         /// Remote port
-        #[clap(short = 'P', long, display_order = 2)]
-        remote_port: u16,
+        #[clap(
+            short = 'P',
+            long,
+            display_order = 2,
+            required = false,
+            required_unless_present = "listen"
+        )]
+        remote_port: Option<u16>,
 
         #[clap(flatten)]
         shared_options: SharedOptions,
@@ -133,12 +145,24 @@ pub enum Command {
     /// UDP connection
     Udp {
         /// Remote host
-        #[clap(short = 'H', long, display_order = 1)]
-        remote_host: String,
+        #[clap(
+            short = 'H',
+            long,
+            display_order = 1,
+            required = false,
+            required_unless_present = "listen"
+        )]
+        remote_host: Option<String>,
 
         /// Remote port
-        #[clap(short = 'P', long, display_order = 2)]
-        remote_port: u16,
+        #[clap(
+            short = 'P',
+            long,
+            display_order = 2,
+            required = false,
+            required_unless_present = "listen"
+        )]
+        remote_port: Option<u16>,
 
         #[clap(flatten)]
         shared_options: SharedOptions,
@@ -164,15 +188,16 @@ pub struct SharedOptions {
     pub ip_proto: IpProtocol,
 
     /// Source IPv4 Address
-    #[clap(long, default_value = BIND_ADDR_IPV4, display_order = 125)]
+    #[clap(short = '4', long, default_value = BIND_ADDR_IPV4, display_order = 125)]
     pub local_v4: String,
 
     /// Source IPv6 Address
-    #[clap(long, default_value = BIND_ADDR_IPV6, display_order = 126)]
+    #[clap(short = '6', long, default_value = BIND_ADDR_IPV6, display_order = 126)]
     pub local_v6: String,
 
-    /// Source port (0 detects random unused high port between 1024-65534)
-    #[clap(long, default_value_t = BIND_PORT, display_order = 127)]
+    /// Source port (0 detects random unused high port between 1024-65534).
+    /// Required in listen mode.
+    #[clap(short = 'p', long, default_value_t = BIND_PORT, display_order = 127, required_if_eq("listen", "true"))]
     pub local_port: u16,
 
     /// NetKraken peer messaging
@@ -454,22 +479,28 @@ impl Cli {
             } => {
                 let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
 
-                let tcp_client_options = TcpClientOptions {
-                    remote_host,
-                    remote_port,
-                    local_ipv4,
-                    local_ipv6,
-                    local_port,
-                };
                 if shared_options.listen {
                     let tcp_server = TcpServer {
-                        listen_ip: tcp_client_options.local_ipv4.to_string(),
-                        listen_port: tcp_client_options.local_port,
+                        listen_ip: local_ipv4.to_string(),
+                        listen_port: local_port,
                         logging_options,
                         listen_options,
                     };
                     tcp_server.listen().await?;
                 } else {
+                    // Client mode - remote_host and remote_port must be Some
+                    let remote_host = remote_host
+                        .ok_or_else(|| anyhow::anyhow!("Remote host is required when not in listen mode"))?;
+                    let remote_port = remote_port
+                        .ok_or_else(|| anyhow::anyhow!("Remote port is required when not in listen mode"))?;
+
+                    let tcp_client_options = TcpClientOptions {
+                        remote_host,
+                        remote_port,
+                        local_ipv4,
+                        local_ipv6,
+                        local_port,
+                    };
                     let tcp_client = TcpClient {
                         client_options: tcp_client_options,
                         logging_options,
@@ -486,22 +517,29 @@ impl Cli {
             } => {
                 let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
 
-                let udp_client_options = UdpClientOptions {
-                    remote_host,
-                    remote_port,
-                    local_ipv4,
-                    local_ipv6,
-                    local_port,
-                };
                 if shared_options.listen {
-                    let tcp_server = UdpServer {
-                        listen_ip: udp_client_options.local_ipv4.to_string(),
-                        listen_port: udp_client_options.local_port,
+                    let udp_server = UdpServer {
+                        listen_ip: local_ipv4.to_string(),
+                        listen_port: local_port,
                         logging_options,
                         listen_options,
                     };
-                    tcp_server.listen().await?;
+                    udp_server.listen().await?;
                 } else {
+                    // Client mode - remote_host and remote_port must be Some
+                    let remote_host = remote_host
+                        .ok_or_else(|| anyhow::anyhow!("Remote host is required when not in listen mode"))?;
+                    let remote_port = remote_port
+                        .ok_or_else(|| anyhow::anyhow!("Remote port is required when not in listen mode"))?;
+
+                    let udp_client_options = UdpClientOptions {
+                        remote_host,
+                        remote_port,
+                        local_ipv4,
+                        local_ipv6,
+                        local_port,
+                    };
+
                     let tcp_client = UdpClient {
                         client_options: udp_client_options,
                         logging_options,
