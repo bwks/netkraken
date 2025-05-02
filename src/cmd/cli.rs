@@ -25,12 +25,14 @@ use crate::util::validate::validate_local_ip;
 
 #[derive(Debug, Subcommand, PartialEq, Clone)]
 pub enum ConfigCommand {
+    /// Create configuration
     Create {
         /// Config filename.
         /// Search Path: $CWD/nk.toml
         #[clap(short, long, default_value = CONFIG_FILE)]
         file: String,
 
+        /// Warning: Overwrites existing file if found in path.
         #[clap(long, default_value_t = false)]
         force: bool,
     },
@@ -38,13 +40,16 @@ pub enum ConfigCommand {
 
 #[derive(Debug, Subcommand, PartialEq)]
 pub enum Command {
-    /// Generate a NetKraken config
+    /// Generate a NetKraken configuration
     Config {
         #[clap(subcommand)]
         command: ConfigCommand,
     },
 
     /// DNS client
+    #[command(after_help = format_examples(&[
+        "nk dns -H example.com  # DNS ping",
+    ]))]
     Dns {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
@@ -67,6 +72,9 @@ pub enum Command {
     },
 
     /// HTTP client
+    #[command(after_help = format_examples(&[
+        "nk http -H example.com  # HTTP ping",
+    ]))]
     Http {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
@@ -85,6 +93,9 @@ pub enum Command {
     },
 
     /// HTTPS client
+    #[command(after_help = format_examples(&[
+        "nk https -H example.com  # HTTPS ping",
+    ]))]
     Https {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
