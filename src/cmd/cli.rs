@@ -44,7 +44,7 @@ pub enum Command {
         command: ConfigCommand,
     },
 
-    /// DNS connection
+    /// DNS client
     Dns {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
@@ -66,7 +66,7 @@ pub enum Command {
         shared_options: SharedOptions,
     },
 
-    /// HTTP connection
+    /// HTTP client
     Http {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
@@ -84,7 +84,7 @@ pub enum Command {
         shared_options: SharedOptions,
     },
 
-    /// HTTPS connection
+    /// HTTPS client
     Https {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
@@ -106,7 +106,10 @@ pub enum Command {
         shared_options: SharedOptions,
     },
 
-    /// ICMP connection
+    /// ICMP client
+    #[command(after_help = format_examples(&[
+        "nk icmp -H example.com  # ICMP ping",
+    ]))]
     Icmp {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
@@ -116,7 +119,11 @@ pub enum Command {
         shared_options: SharedOptions,
     },
 
-    /// TCP connection
+    /// TCP client/server
+    #[command(after_help = format_examples(&[
+        "nk tcp -H example.com -P 80  # Client TCP ping",
+        "nk tcp -l -p 8080            # Listen as a TCP server",
+    ]))]
     Tcp {
         /// Remote host
         #[clap(
@@ -142,7 +149,11 @@ pub enum Command {
         shared_options: SharedOptions,
     },
 
-    /// UDP connection
+    /// UDP client/server
+    #[command(after_help = format_examples(&[
+        "nk udp -H example.com -P 80  # Client UDP ping",
+        "nk udp -l -p 8080            # Listen as UDP server",
+    ]))]
     Udp {
         /// Remote host
         #[clap(
@@ -555,10 +566,19 @@ impl Cli {
     }
 }
 
-/// Get the local parmaters from the shared options.
+/// Get the local parameters from the shared options.
 fn get_local_params(shared_options: &SharedOptions) -> Result<(IpAddr, IpAddr, u16)> {
     let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
     let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
     let local_port = shared_options.local_port;
     Ok((local_ipv4, local_ipv6, local_port))
+}
+
+/// Format example commands
+fn format_examples(examples: &[&str]) -> String {
+    let mut result = String::from("\x1B[1;4mExamples:\x1B[0m\n");
+    for example in examples {
+        result.push_str(&format!("  {}\n", example));
+    }
+    result
 }
