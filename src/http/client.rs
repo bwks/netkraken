@@ -212,6 +212,7 @@ async fn process_host(
                         Ok(record) => record,
                         Err(e) => ConnectRecord {
                             result: ConnectResult::Error(ConnectError::Unknown),
+                            context: None,
                             protocol: get_connect_method(&client_options.scheme),
                             source: src_ip_port.ipv4.to_string(),
                             destination: dst_socket.to_string(),
@@ -260,6 +261,7 @@ async fn connect_host(
     if src_socket.is_none() {
         return Ok(ConnectRecord {
             result: ConnectResult::Error(ConnectError::BindError),
+            context: None,
             protocol,
             source: bind_addr.to_string(),
             destination: dst_socket.to_string(),
@@ -283,7 +285,7 @@ async fn connect_host(
         HttpScheme::Http => {
             Client::builder()
                 .default_headers(headers)
-                .redirect(reqwest::redirect::Policy::limited(10))
+                .redirect(reqwest::redirect::Policy::none())
                 .resolve(&host_record.host, dst_socket) // Bypass DNS resolution as we have already resolved the IP
                 .timeout(Duration::from_millis(ping_options.timeout as u64))
                 .local_address(bind_addr.ip())
@@ -295,7 +297,7 @@ async fn connect_host(
                 .tls_built_in_root_certs(true) // Use system root certificates
                 .use_rustls_tls() // Use rustls instead of native-tls
                 .tls_sni(true)
-                .redirect(reqwest::redirect::Policy::limited(10))
+                .redirect(reqwest::redirect::Policy::none())
                 .resolve(&host_record.host, dst_socket) // Bypass DNS resolution as we have already resolved the IP
                 .timeout(Duration::from_millis(ping_options.timeout as u64))
                 .local_address(bind_addr.ip());
@@ -326,6 +328,7 @@ async fn connect_host(
 
     let mut conn_record = ConnectRecord {
         result: ConnectResult::Error(ConnectError::Unknown),
+        context: None,
         protocol,
         source: bind_addr.to_string(),
         destination: dst_socket.to_string(),
@@ -346,7 +349,8 @@ async fn connect_host(
             let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
             conn_record.success = true;
             conn_record.time = connection_time;
-            conn_record.result = ConnectResult::Success(ConnectSuccess::Ok);
+            conn_record.result = ConnectResult::Success(ConnectSuccess::Reply);
+            conn_record.context = Some(response.status().as_u16().to_string());
 
             // Extract the local IP address from the response if available
             if let Some(info) = response.extensions().get::<HttpInfo>() {
@@ -376,11 +380,17 @@ async fn connect_host(
             // the client does not support this flow. If we are connected, still consider
             // it a success as we could reach the server.
             if e.is_connect() {
+                let status_code = if let Some(status) = e.status() {
+                    Some(status.as_u16().to_string())
+                } else {
+                    Some("3XX".to_owned())
+                };
                 let post_conn_timestamp = time_now_us();
                 let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
                 conn_record.success = true;
                 conn_record.time = connection_time;
-                conn_record.result = ConnectResult::Success(ConnectSuccess::Ok);
+                conn_record.result = ConnectResult::Success(ConnectSuccess::Reply);
+                conn_record.context = status_code;
             } else {
                 conn_record.error_msg = Some(e.to_string());
                 if e.is_timeout() {

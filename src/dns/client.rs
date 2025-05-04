@@ -202,6 +202,7 @@ async fn process_host(
                         Ok(record) => record,
                         Err(e) => ConnectRecord {
                             result: ConnectResult::Error(ConnectError::Unknown),
+                            context: None,
                             protocol: ConnectMethod::Dns,
                             source: src_ip_port.ipv4.to_string(),
                             destination: dst_socket.to_string(),
@@ -247,6 +248,7 @@ async fn connect_host(
     if local_socket.is_none() {
         return Ok(ConnectRecord {
             result: ConnectResult::Error(ConnectError::BindError),
+            context: None,
             protocol: ConnectMethod::Dns,
             source: bind_addr.to_string(),
             destination: dst_socket.to_string(),
@@ -280,6 +282,7 @@ async fn connect_host(
 
     let mut conn_record = ConnectRecord {
         result: ConnectResult::Error(ConnectError::Unknown),
+        context: None,
         protocol: ConnectMethod::Dns,
         source: bind_addr.to_string(),
         destination: dst_socket.to_string(),

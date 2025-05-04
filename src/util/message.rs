@@ -90,9 +90,11 @@ pub fn client_result_msg(record: &ConnectRecord) -> String {
             )
         }
         ConnectResult::Success(result) => {
+            let context = if let Some(ctx) = &record.context { format!("{} ", ctx) } else { "".to_owned() };
             format!(
-                "{} {} proto={}  src={}  dst={}  time={:.3}ms",
+                "{} {}{} proto={}  src={}  dst={}  time={:.3}ms",
                 result,
+                context,
                 ARROW,
                 record.protocol.to_string().to_uppercase(),
                 record.source,

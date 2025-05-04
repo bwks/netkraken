@@ -222,6 +222,7 @@ async fn connect_host(
     if src_socket.is_none() {
         return ConnectRecord {
             result: ConnectResult::Error(ConnectError::BindError),
+            context: None,
             protocol: ConnectMethod::Icmp,
             source: local_addr,
             destination: dst_socket.to_string(),
@@ -235,6 +236,7 @@ async fn connect_host(
 
     let mut conn_record = ConnectRecord {
         result: ConnectResult::Error(ConnectError::Unknown),
+        context: None,
         protocol: ConnectMethod::Icmp,
         source: local_addr.clone(),
         destination: dst_socket.to_string(),
