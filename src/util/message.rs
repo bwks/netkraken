@@ -8,19 +8,35 @@ use crate::core::common::{ClientResult, ConnectMethod, ConnectRecord, ConnectRes
 use crate::core::konst::ARROW;
 
 /// Return server start message
-pub fn server_start_msg(protocol: ConnectMethod, bind_addr: &IpAddr, bind_port: &u16) -> String {
-    let addr = match bind_addr.is_ipv6() {
-        true => format!("[{}]", bind_addr),
-        false => bind_addr.to_string(),
-    };
+pub fn server_start_msg(
+    protocol: ConnectMethod,
+    bind_v4_addr: Option<&IpAddr>,
+    bind_v6_addr: Option<&IpAddr>,
+    bind_port: &u16,
+) -> String {
+    let listen_v4 = if let Some(addr) = bind_v4_addr { addr.to_string() } else { "".to_string() };
+    let listen_v6 = if let Some(addr) = bind_v6_addr { addr.to_string() } else { "".to_string() };
 
-    format!(
-        "{} server listening on {}:{}\n\
-        Press CRTL+C to exit\n",
-        protocol.to_string().to_uppercase(),
-        addr,
-        bind_port,
-    )
+    let mut listen_msg = String::new();
+    if !listen_v4.is_empty() {
+        listen_msg.push_str(&format!(
+            "{} server listening on {}:{}\n",
+            protocol.to_string().to_uppercase(),
+            listen_v4,
+            bind_port
+        ));
+    }
+    if !listen_v6.is_empty() {
+        listen_msg.push_str(&format!(
+            "{} server listening on [{}]:{}\n",
+            protocol.to_string().to_uppercase(),
+            listen_v6,
+            bind_port
+        ));
+    }
+    listen_msg.push_str("Press CRTL+C to exit\n");
+
+    listen_msg
 }
 
 /// Return a list of resolved IPs from a hostname
@@ -234,7 +250,7 @@ mod tests {
     fn server_start_msg_is_expected() {
         let listen_ip: IpAddr = "127.0.0.1".parse::<IpAddr>().unwrap();
 
-        let msg = server_start_msg(ConnectMethod::Tcp, &listen_ip, &42069);
+        let msg = server_start_msg(ConnectMethod::Tcp, Some(&listen_ip), None, &42069);
 
         assert_eq!(
             msg,

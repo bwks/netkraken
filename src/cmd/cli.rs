@@ -17,20 +17,22 @@ use crate::dns::client::{DnsClient, DnsClientOptions};
 use crate::http::client::{HttpClient, HttpClientOptions};
 use crate::icmp::client::{IcmpClient, IcmpClientOptions};
 use crate::tcp::client::{TcpClient, TcpClientOptions};
-use crate::tcp::server::TcpServer;
+use crate::tcp::server::{TcpServer, TcpServerOptions};
 use crate::udp::client::{UdpClient, UdpClientOptions};
-use crate::udp::server::UdpServer;
+use crate::udp::server::{UdpServer, UdpServerOptions};
 use crate::util::parser::parse_ipaddr;
 use crate::util::validate::validate_local_ip;
 
 #[derive(Debug, Subcommand, PartialEq, Clone)]
 pub enum ConfigCommand {
+    /// Create configuration
     Create {
         /// Config filename.
         /// Search Path: $CWD/nk.toml
         #[clap(short, long, default_value = CONFIG_FILE)]
         file: String,
 
+        /// Warning: Overwrites existing file if found in path.
         #[clap(long, default_value_t = false)]
         force: bool,
     },
@@ -38,13 +40,16 @@ pub enum ConfigCommand {
 
 #[derive(Debug, Subcommand, PartialEq)]
 pub enum Command {
-    /// Generate a NetKraken config
+    /// Generate a NetKraken configuration
     Config {
         #[clap(subcommand)]
         command: ConfigCommand,
     },
 
-    /// DNS connection
+    /// DNS client
+    #[command(after_help = format_examples(&[
+        "nk dns -H example.com  # DNS ping",
+    ]))]
     Dns {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
@@ -66,7 +71,10 @@ pub enum Command {
         shared_options: SharedOptions,
     },
 
-    /// HTTP connection
+    /// HTTP client
+    #[command(after_help = format_examples(&[
+        "nk http -H example.com  # HTTP ping",
+    ]))]
     Http {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
@@ -84,7 +92,10 @@ pub enum Command {
         shared_options: SharedOptions,
     },
 
-    /// HTTPS connection
+    /// HTTPS client
+    #[command(after_help = format_examples(&[
+        "nk https -H example.com  # HTTPS ping",
+    ]))]
     Https {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
@@ -106,7 +117,10 @@ pub enum Command {
         shared_options: SharedOptions,
     },
 
-    /// ICMP connection
+    /// ICMP client
+    #[command(after_help = format_examples(&[
+        "nk icmp -H example.com  # ICMP ping",
+    ]))]
     Icmp {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
@@ -116,29 +130,61 @@ pub enum Command {
         shared_options: SharedOptions,
     },
 
-    /// TCP connection
+    /// TCP client/server
+    #[command(after_help = format_examples(&[
+        "nk tcp -H example.com -P 80  # Client TCP ping",
+        "nk tcp -l -p 8080            # Listen as a TCP server",
+        ]))]
     Tcp {
         /// Remote host
-        #[clap(short = 'H', long, display_order = 1)]
-        remote_host: String,
+        #[clap(
+            short = 'H',
+            long,
+            display_order = 1,
+            required = false,
+            required_unless_present = "listen"
+        )]
+        remote_host: Option<String>,
 
         /// Remote port
-        #[clap(short = 'P', long, display_order = 2)]
-        remote_port: u16,
+        #[clap(
+            short = 'P',
+            long,
+            display_order = 2,
+            required = false,
+            required_unless_present = "listen"
+        )]
+        remote_port: Option<u16>,
 
         #[clap(flatten)]
         shared_options: SharedOptions,
     },
 
-    /// UDP connection
+    /// UDP client/server
+    #[command(after_help = format_examples(&[
+        "nk udp -H example.com -P 80  # Client UDP ping",
+        "nk udp -l -p 8080            # Listen as UDP server",
+    ]))]
     Udp {
         /// Remote host
-        #[clap(short = 'H', long, display_order = 1)]
-        remote_host: String,
+        #[clap(
+            short = 'H',
+            long,
+            display_order = 1,
+            required = false,
+            required_unless_present = "listen"
+        )]
+        remote_host: Option<String>,
 
         /// Remote port
-        #[clap(short = 'P', long, display_order = 2)]
-        remote_port: u16,
+        #[clap(
+            short = 'P',
+            long,
+            display_order = 2,
+            required = false,
+            required_unless_present = "listen"
+        )]
+        remote_port: Option<u16>,
 
         #[clap(flatten)]
         shared_options: SharedOptions,
@@ -164,15 +210,16 @@ pub struct SharedOptions {
     pub ip_proto: IpProtocol,
 
     /// Source IPv4 Address
-    #[clap(long, default_value = BIND_ADDR_IPV4, display_order = 125)]
+    #[clap(short = '4', long, default_value = BIND_ADDR_IPV4, display_order = 125)]
     pub local_v4: String,
 
     /// Source IPv6 Address
-    #[clap(long, default_value = BIND_ADDR_IPV6, display_order = 126)]
+    #[clap(short = '6', long, default_value = BIND_ADDR_IPV6, display_order = 126)]
     pub local_v6: String,
 
-    /// Source port (0 detects random unused high port between 1024-65534)
-    #[clap(long, default_value_t = BIND_PORT, display_order = 127)]
+    /// Source port (0 detects random unused high port between 1024-65534).
+    /// Required in listen mode.
+    #[clap(short = 'p', long, default_value_t = BIND_PORT, display_order = 127, required_if_eq("listen", "true"))]
     pub local_port: u16,
 
     /// NetKraken peer messaging
@@ -453,23 +500,33 @@ impl Cli {
                 shared_options,
             } => {
                 let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
-
-                let tcp_client_options = TcpClientOptions {
-                    remote_host,
-                    remote_port,
+                let server_options = TcpServerOptions {
                     local_ipv4,
                     local_ipv6,
                     local_port,
                 };
                 if shared_options.listen {
                     let tcp_server = TcpServer {
-                        listen_ip: tcp_client_options.local_ipv4.to_string(),
-                        listen_port: tcp_client_options.local_port,
+                        server_options,
                         logging_options,
                         listen_options,
+                        ip_options,
                     };
                     tcp_server.listen().await?;
                 } else {
+                    // Client mode - remote_host and remote_port must be Some
+                    let remote_host = remote_host
+                        .ok_or_else(|| anyhow::anyhow!("Remote host is required when not in listen mode"))?;
+                    let remote_port = remote_port
+                        .ok_or_else(|| anyhow::anyhow!("Remote port is required when not in listen mode"))?;
+
+                    let tcp_client_options = TcpClientOptions {
+                        remote_host,
+                        remote_port,
+                        local_ipv4,
+                        local_ipv6,
+                        local_port,
+                    };
                     let tcp_client = TcpClient {
                         client_options: tcp_client_options,
                         logging_options,
@@ -485,23 +542,35 @@ impl Cli {
                 shared_options,
             } => {
                 let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
-
-                let udp_client_options = UdpClientOptions {
-                    remote_host,
-                    remote_port,
+                let server_options = UdpServerOptions {
                     local_ipv4,
                     local_ipv6,
                     local_port,
                 };
+
                 if shared_options.listen {
-                    let tcp_server = UdpServer {
-                        listen_ip: udp_client_options.local_ipv4.to_string(),
-                        listen_port: udp_client_options.local_port,
+                    let udp_server = UdpServer {
+                        server_options,
                         logging_options,
                         listen_options,
+                        ip_options,
                     };
-                    tcp_server.listen().await?;
+                    udp_server.listen().await?;
                 } else {
+                    // Client mode - remote_host and remote_port must be Some
+                    let remote_host = remote_host
+                        .ok_or_else(|| anyhow::anyhow!("Remote host is required when not in listen mode"))?;
+                    let remote_port = remote_port
+                        .ok_or_else(|| anyhow::anyhow!("Remote port is required when not in listen mode"))?;
+
+                    let udp_client_options = UdpClientOptions {
+                        remote_host,
+                        remote_port,
+                        local_ipv4,
+                        local_ipv6,
+                        local_port,
+                    };
+
                     let tcp_client = UdpClient {
                         client_options: udp_client_options,
                         logging_options,
@@ -517,10 +586,22 @@ impl Cli {
     }
 }
 
-/// Get the local parmaters from the shared options.
+/// Get the local parameters from the shared options.
 fn get_local_params(shared_options: &SharedOptions) -> Result<(IpAddr, IpAddr, u16)> {
     let local_ipv4 = parse_ipaddr(&shared_options.local_v4)?;
     let local_ipv6 = parse_ipaddr(&shared_options.local_v6)?;
     let local_port = shared_options.local_port;
     Ok((local_ipv4, local_ipv6, local_port))
+}
+
+/// Format example commands
+fn format_examples(examples: &[&str]) -> String {
+    let mut result = String::from("\x1B[1;4mExamples:\x1B[0m\n");
+    for example in examples {
+        result.push_str(&format!("  {}\n", example));
+    }
+    // Forces visible blank new line.
+    // Otherwise, clap strips out raw trailing whitespace.
+    result.push_str("\x1B[0m\n");
+    result
 }
