@@ -63,8 +63,24 @@ impl TcpServer {
                 listener(listener_v6, &self.listen_options, &self.logging_options).await?;
             }
             IpProtocol::All => {
-                listener(listener_v4, &self.listen_options, &self.logging_options).await?;
-                listener(listener_v6, &self.listen_options, &self.logging_options).await?;
+                let listen_options_v4 = self.listen_options.clone();
+                let logging_options_v4 = self.logging_options.clone();
+                let v4_handle = tokio::spawn(async move {
+                    //
+                    listener(listener_v4, &listen_options_v4, &logging_options_v4).await
+                });
+
+                let listen_options_v6 = self.listen_options.clone();
+                let logging_options_v6 = self.logging_options.clone();
+                let v6_handle = tokio::spawn(async move {
+                    //
+                    listener(listener_v6, &listen_options_v6, &logging_options_v6).await
+                });
+
+                // Wait for both listeners to complete (they should run indefinitely)
+                let (v4_result, v6_result) = tokio::join!(v4_handle, v6_handle);
+                v4_result??;
+                v6_result??;
             }
         }
 
