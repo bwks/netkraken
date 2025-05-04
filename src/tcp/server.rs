@@ -63,14 +63,14 @@ impl TcpServer {
                 listener(listener_v6, &self.listen_options, &self.logging_options).await?;
             }
             IpProtocol::All => {
-                let listen_options_v4 = self.listen_options.clone();
+                let listen_options_v4 = self.listen_options;
                 let logging_options_v4 = self.logging_options.clone();
                 let v4_handle = tokio::spawn(async move {
                     //
                     listener(listener_v4, &listen_options_v4, &logging_options_v4).await
                 });
 
-                let listen_options_v6 = self.listen_options.clone();
+                let listen_options_v6 = self.listen_options;
                 let logging_options_v6 = self.logging_options.clone();
                 let v6_handle = tokio::spawn(async move {
                     //
