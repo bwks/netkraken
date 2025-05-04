@@ -17,7 +17,7 @@ use crate::dns::client::{DnsClient, DnsClientOptions};
 use crate::http::client::{HttpClient, HttpClientOptions};
 use crate::icmp::client::{IcmpClient, IcmpClientOptions};
 use crate::tcp::client::{TcpClient, TcpClientOptions};
-use crate::tcp::server::TcpServer;
+use crate::tcp::server::{TcpServer, TcpServerOptions};
 use crate::udp::client::{UdpClient, UdpClientOptions};
 use crate::udp::server::UdpServer;
 use crate::util::parser::parse_ipaddr;
@@ -134,7 +134,7 @@ pub enum Command {
     #[command(after_help = format_examples(&[
         "nk tcp -H example.com -P 80  # Client TCP ping",
         "nk tcp -l -p 8080            # Listen as a TCP server",
-    ]))]
+        ]))]
     Tcp {
         /// Remote host
         #[clap(
@@ -500,13 +500,17 @@ impl Cli {
                 shared_options,
             } => {
                 let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
-
+                let server_options = TcpServerOptions {
+                    local_ipv4,
+                    local_ipv6,
+                    local_port,
+                };
                 if shared_options.listen {
                     let tcp_server = TcpServer {
-                        listen_ip: local_ipv4.to_string(),
-                        listen_port: local_port,
+                        server_options,
                         logging_options,
                         listen_options,
+                        ip_options,
                     };
                     tcp_server.listen().await?;
                 } else {
@@ -591,5 +595,8 @@ fn format_examples(examples: &[&str]) -> String {
     for example in examples {
         result.push_str(&format!("  {}\n", example));
     }
+    // Forces visible blank new line.
+    // Otherwise, clap strips out raw trailing whitespace.
+    result.push_str("\x1B[0m\n");
     result
 }
