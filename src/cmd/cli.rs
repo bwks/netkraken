@@ -19,7 +19,7 @@ use crate::icmp::client::{IcmpClient, IcmpClientOptions};
 use crate::tcp::client::{TcpClient, TcpClientOptions};
 use crate::tcp::server::{TcpServer, TcpServerOptions};
 use crate::udp::client::{UdpClient, UdpClientOptions};
-use crate::udp::server::UdpServer;
+use crate::udp::server::{UdpServer, UdpServerOptions};
 use crate::util::parser::parse_ipaddr;
 use crate::util::validate::validate_local_ip;
 
@@ -542,13 +542,18 @@ impl Cli {
                 shared_options,
             } => {
                 let (local_ipv4, local_ipv6, local_port) = get_local_params(&shared_options)?;
+                let server_options = UdpServerOptions {
+                    local_ipv4,
+                    local_ipv6,
+                    local_port,
+                };
 
                 if shared_options.listen {
                     let udp_server = UdpServer {
-                        listen_ip: local_ipv4.to_string(),
-                        listen_port: local_port,
+                        server_options,
                         logging_options,
                         listen_options,
+                        ip_options,
                     };
                     udp_server.listen().await?;
                 } else {

@@ -14,8 +14,8 @@ pub fn server_start_msg(
     bind_v6_addr: Option<&IpAddr>,
     bind_port: &u16,
 ) -> String {
-    let listen_v4 = if bind_v4_addr.is_some() { bind_v4_addr.unwrap().to_string() } else { "".to_string() };
-    let listen_v6 = if bind_v6_addr.is_some() { bind_v6_addr.unwrap().to_string() } else { "".to_string() };
+    let listen_v4 = if let Some(addr) = bind_v4_addr { addr.to_string() } else { "".to_string() };
+    let listen_v6 = if let Some(addr) = bind_v6_addr { addr.to_string() } else { "".to_string() };
 
     let mut listen_msg = String::new();
     if !listen_v4.is_empty() {

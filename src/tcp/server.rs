@@ -57,14 +57,14 @@ impl TcpServer {
 
         match self.ip_options.ip_protocol {
             IpProtocol::V4 => {
-                let _listen_v4 = listener(listener_v4, &self.listen_options, &self.logging_options).await?;
+                listener(listener_v4, &self.listen_options, &self.logging_options).await?;
             }
             IpProtocol::V6 => {
-                let _listen_v6 = listener(listener_v6, &self.listen_options, &self.logging_options).await?;
+                listener(listener_v6, &self.listen_options, &self.logging_options).await?;
             }
             IpProtocol::All => {
-                let _listen_v4 = listener(listener_v4, &self.listen_options, &self.logging_options).await?;
-                let _listen_v6 = listener(listener_v6, &self.listen_options, &self.logging_options).await?;
+                listener(listener_v4, &self.listen_options, &self.logging_options).await?;
+                listener(listener_v6, &self.listen_options, &self.logging_options).await?;
             }
         }
 
@@ -79,7 +79,7 @@ async fn listener(
     loop {
         let (mut stream, _) = tcp_listener.accept().await?;
         let logging_options = logging_options.clone();
-        let listen_options = listen_options.clone();
+        let listen_options = *listen_options;
 
         tokio::spawn(async move {
             let receive_time_utc = time_now_utc();
