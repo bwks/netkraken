@@ -278,12 +278,14 @@ async fn connect_host(
 
             // This is safe to because:
             //  - recv_from guarantees initialization of first n bytes
-            //  - We only access buf[..n] on successful recieve.
+            //  - We only access buf[..n] on successful receive.
             let received_data = buf[..n].iter().map(|b| unsafe { b.assume_init() }).collect::<Vec<u8>>();
 
-            if parse_icmp_reply(&received_data, identifier, send_count, is_loopback) {
+            let icmp_type = parse_icmp_reply(&received_data, identifier, send_count, is_loopback);
+            if icmp_type != 255 {
                 conn_record.success = true;
-                conn_record.result = ConnectResult::Success(ConnectSuccess::Ok);
+                conn_record.context = Some(icmp_type.to_string());
+                conn_record.result = ConnectResult::Success(ConnectSuccess::Reply);
                 conn_record.time = connection_time;
             } else {
                 conn_record.result = ConnectResult::Error(ConnectError::Error);
@@ -318,10 +320,41 @@ fn build_icmp_echo(identifier: u16, seq: u16, is_ipv6: bool) -> Vec<u8> {
     packet
 }
 
-fn parse_icmp_reply(packet: &[u8], identifier: u16, seq: u16, is_loopback: bool) -> bool {
+/// Parses and validates an ICMP reply packet.
+///
+/// This function examines a received packet buffer to determine if it contains
+/// a valid ICMP Echo Reply that matches our expected parameters.
+///
+/// # Arguments
+///
+/// * `packet` - A byte slice containing the received packet data
+/// * `identifier` - The identifier value from our original Echo Request
+/// * `seq` - The sequence number from our original Echo Request
+/// * `is_loopback` - Whether we're pinging a loopback address
+///
+/// # Returns
+///
+/// Returns the ICMP message type if the packet is a valid response matching our
+/// request parameters, or 255 if the packet is invalid or doesn't match.
+///
+/// # Supported Packet Formats
+///
+/// This function can parse:
+/// * IPv4 packets with IP headers (starts with version nibble 4)
+/// * IPv6 packets with IP headers (starts with version nibble 6)
+/// * Raw ICMP/ICMPv6 data without IP headers
+///
+/// # Validation Checks
+///
+/// For a packet to be considered valid:
+/// 1. Must contain a complete ICMP header (8+ bytes)
+/// 2. ICMP type must be appropriate (Echo Reply, or Echo Request for loopback)
+/// 3. ICMP code must be 0
+/// 4. Identifier and sequence number must match our original request
+fn parse_icmp_reply(packet: &[u8], identifier: u16, seq: u16, is_loopback: bool) -> u8 {
     // Make sure we have at least one byte for the IP header
     if packet.is_empty() {
-        return false;
+        return 255;
     }
 
     // Check if we're dealing with a packet that includes IP header or just ICMP data
@@ -334,7 +367,7 @@ fn parse_icmp_reply(packet: &[u8], identifier: u16, seq: u16, is_loopback: bool)
         // This is likely an IPv4 packet with header
         let ip_header_length = (packet[0] & 0x0F) * 4;
         if packet.len() < ip_header_length as usize {
-            return false;
+            return 255;
         }
         icmp_data = &packet[ip_header_length as usize..];
 
@@ -343,7 +376,7 @@ fn parse_icmp_reply(packet: &[u8], identifier: u16, seq: u16, is_loopback: bool)
         // This is likely an IPv6 packet with header (though rare with raw sockets)
         if packet.len() < 40 {
             // IPv6 header is fixed 40 bytes
-            return false;
+            return 255;
         }
         icmp_data = &packet[40..];
 
@@ -360,31 +393,38 @@ fn parse_icmp_reply(packet: &[u8], identifier: u16, seq: u16, is_loopback: bool)
         );
     } else {
         // Unrecognized format
-        // println!("Unrecognized packet format. First byte: {}", packet[0]);
-        return false;
+        return 255;
     }
 
     // Now check the ICMP header
-    let icmp_types = if is_loopback {
-        // We are looking for the ICMP types:
-        //  - 0/129 - Echo Reply (ipv4/ipv6)
-        //  - 8/128 - Echo Request (ipv4/ipv6)
+    if icmp_data.len() < 8 {
+        return 255;
+    }
+
+    let icmp_type = icmp_data[0];
+    let is_valid_type = if is_loopback {
         // When pinging a loopback, sometimes we get the Echo Request type reflected back,
-        // so we need to check for both Type 0/128 and 8/129 when pinging a loopback.
-        icmp_data[0] == ICMPV4_ECHO_REPLY
-            || icmp_data[0] == ICMPV4_ECHO_REQUEST
-            || icmp_data[0] == ICMPV6_ECHO_REPLY
-            || icmp_data[0] == ICMPV6_ECHO_REQUEST
+        // so we need to check for both Echo Reply and Echo Request
+        icmp_type == ICMPV4_ECHO_REPLY
+            || icmp_type == ICMPV4_ECHO_REQUEST
+            || icmp_type == ICMPV6_ECHO_REPLY
+            || icmp_type == ICMPV6_ECHO_REQUEST
     } else {
         // Otherwise if it's a remote host, only look for Echo reply
-        icmp_data[0] == ICMPV4_ECHO_REPLY || icmp_data[0] == ICMPV6_ECHO_REPLY
+        icmp_type == ICMPV4_ECHO_REPLY || icmp_type == ICMPV6_ECHO_REPLY
     };
 
-    icmp_data.len() >= 8
-        && icmp_types // Echo Reply type
+    let is_valid = icmp_data.len() >= 8
+        && is_valid_type
         && icmp_data[1] == 0  // Code
         && u16::from_be_bytes([icmp_data[4], icmp_data[5]]) == identifier
-        && u16::from_be_bytes([icmp_data[6], icmp_data[7]]) == seq
+        && u16::from_be_bytes([icmp_data[6], icmp_data[7]]) == seq;
+
+    if is_valid {
+        icmp_type // Return the ICMP type if valid
+    } else {
+        255 // Return 255 for any invalid reply
+    }
 }
 
 fn icmp_checksum(data: &[u8]) -> u16 {

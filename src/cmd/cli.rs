@@ -209,15 +209,15 @@ pub struct SharedOptions {
     #[clap(short = 'I', long, default_value_t = IpProtocol::V4, display_order = 124)]
     pub ip_proto: IpProtocol,
 
-    /// Source IPv4 Address
+    /// Local IPv4 Address
     #[clap(short = '4', long, default_value = BIND_ADDR_IPV4, display_order = 125)]
     pub local_v4: String,
 
-    /// Source IPv6 Address
+    /// Local IPv6 Address
     #[clap(short = '6', long, default_value = BIND_ADDR_IPV6, display_order = 126)]
     pub local_v6: String,
 
-    /// Source port (0 detects random unused high port between 1024-65534).
+    /// Local port (0 detects random unused high port between 1024-65534).
     /// Required in listen mode.
     #[clap(short = 'p', long, default_value_t = BIND_PORT, display_order = 127, required_if_eq("listen", "true"))]
     pub local_port: u16,
