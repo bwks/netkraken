@@ -59,7 +59,7 @@ pub enum Command {
         #[clap(short = 'P', long, default_value_t = DNS_PORT, display_order = 2)]
         remote_port: u16,
 
-        /// Test DNS domain
+        /// DNS domain to lookup
         #[clap(short, long, default_value = DNS_LOOKUP_DOMAIN, display_order = 50)]
         domain: String,
 

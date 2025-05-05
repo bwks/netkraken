@@ -1,6 +1,7 @@
 use hickory_resolver::Resolver;
 use hickory_resolver::config::{NameServerConfig, ResolverConfig};
 use hickory_resolver::name_server::TokioConnectionProvider;
+use hickory_resolver::proto::rr::RecordType;
 use hickory_resolver::proto::xfer::Protocol;
 
 use std::net::{IpAddr, SocketAddr};
@@ -9,6 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{Result, bail};
 use futures::StreamExt;
+use futures::future::join_all;
 use tokio::signal;
 
 use crate::core::common::{
@@ -280,6 +282,9 @@ async fn connect_host(
     // Build resolver with our config and options
     let resolver = Resolver::builder_with_config(config, TokioConnectionProvider::default()).build();
 
+    // DNS record types to query
+    let query_types = [RecordType::A, RecordType::AAAA];
+
     let mut conn_record = ConnectRecord {
         result: ConnectResult::Error(ConnectError::Unknown),
         context: None,
@@ -294,34 +299,62 @@ async fn connect_host(
     // record timestamp before connection
     let pre_conn_timestamp = time_now_us();
 
-    // `lookup_ip` returns an error if the dns record is not found.
-    // `server_connected` is used to reduce repeating successful
-    // params in `conn_record` in the error case.
-    let mut server_connected = false;
+    // Normalize the domain to enhance query performance.
+    // A trailing '.' ensure only a single query is performed.
+    let domain = if client_options.domain.ends_with(".") {
+        client_options.domain
+    } else {
+        format!("{}.", client_options.domain)
+    };
+
+    // Create individual futures for each lookup
+    let lookup_futures = query_types
+        .iter()
+        .map(|&record_type| resolver.lookup(domain.clone(), record_type))
+        .collect::<Vec<_>>();
 
     // DOGWATER: I could not find a method to set the timeout in the Hickory resolver config.
     // Wrap the request in a tokio timeout to control this until a method can be
     // found in the Hickory Resolver.
     let result = tokio::time::timeout(
         std::time::Duration::from_millis(ping_options.timeout as u64),
-        resolver.lookup_ip(client_options.domain),
+        join_all(lookup_futures),
     )
     .await;
 
+    // `lookup_ip` returns an error if the dns record is not found.
+    // `server_connected` is used to reduce repeating successful
+    // params in `conn_record` in the error case.
+    let mut server_connected = false;
+    let mut records_found = vec![];
     match result {
-        // We connected to the server
-        Ok(lookup_result) => match lookup_result {
-            Ok(_) => {
-                // We got a positive response (records where found.)
-                server_connected = true;
-            }
-            Err(e) => {
-                // We got a negative response (no records where found, or other error.)
-                if e.proto().is_some() {
-                    server_connected = true;
+        // We connected to the server and got responses for all queries
+        Ok(lookup_results) => {
+            server_connected = true;
+
+            for lookup_result in lookup_results {
+                match lookup_result {
+                    Ok(r) => {
+                        // We got a positive response for this record type
+                        for record in r.records() {
+                            let data = record.clone().into_data();
+                            records_found.push(data.record_type().to_string());
+                        }
+                    }
+                    Err(e) => {
+                        // Handle errors for this specific lookup
+                        if e.proto().is_some() {
+                            if e.is_nx_domain() {
+                                records_found.push("NX".to_owned());
+                            }
+                            if e.is_no_records_found() {
+                                records_found.push("NR".to_owned());
+                            }
+                        }
+                    }
                 }
             }
-        },
+        }
         Err(_) => {
             // Timeout connecting to the server
             conn_record.result = ConnectResult::Error(ConnectError::Timeout);
@@ -329,12 +362,16 @@ async fn connect_host(
         }
     };
 
+    records_found.sort();
+    records_found.dedup();
+
     if server_connected {
         let post_conn_timestamp = time_now_us();
         let connection_time = calc_connect_ms(pre_conn_timestamp, post_conn_timestamp);
         conn_record.success = true;
+        conn_record.context = Some(records_found.join(", "));
         conn_record.time = connection_time;
-        conn_record.result = ConnectResult::Success(ConnectSuccess::Ok);
+        conn_record.result = ConnectResult::Success(ConnectSuccess::Reply);
     }
 
     Ok(conn_record)
