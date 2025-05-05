@@ -21,6 +21,7 @@ pub const DNS_PORT: u16 = 53;
 pub const HTTP_PORT: u16 = 80;
 pub const HTTPS_PORT: u16 = 443;
 pub const ARROW: &str = "->";
+pub const NEW_LINE: &str = "\x1B[0m\n";
 
 // ICMP
 pub const ICMP_PORT: u16 = 0;
