@@ -249,6 +249,7 @@ pub struct ListenOptions {
 #[derive(Clone, Debug, Serialize)]
 pub struct ConnectRecord {
     pub result: ConnectResult,
+    pub context: Option<String>,
     pub protocol: ConnectMethod,
     pub source: String,
     pub destination: String,
@@ -265,6 +266,7 @@ impl Display for ConnectRecord {
         };
         let msg = format!(
             "result: {}
+context: {:?}
 protocol: {}
 source: {}
 destination: {}
@@ -273,6 +275,7 @@ success: {}
 error: {}
 ",
             self.result,
+            self.context,
             self.protocol.to_string().to_uppercase(),
             self.source,
             self.destination,
