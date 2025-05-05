@@ -10,8 +10,8 @@ use crate::core::common::{
 use crate::core::config::Config;
 use crate::core::konst::{
     APP_NAME, BIND_ADDR_IPV4, BIND_ADDR_IPV6, BIND_PORT, CLI_HEADER_MSG, CONFIG_FILE, CURRENT_DIR, DNS_LOOKUP_DOMAIN,
-    DNS_PORT, HTTP_PORT, HTTPS_PORT, LOGFILE_NAME, LOGGING_JSON, LOGGING_QUIET, LOGGING_SYSLOG, PING_INTERVAL,
-    PING_NK_PEER, PING_REPEAT, PING_TIMEOUT,
+    DNS_PORT, HTTP_PORT, HTTPS_PORT, LOGFILE_NAME, LOGGING_JSON, LOGGING_QUIET, LOGGING_SYSLOG, NEW_LINE,
+    PING_INTERVAL, PING_NK_PEER, PING_REPEAT, PING_TIMEOUT,
 };
 use crate::dns::client::{DnsClient, DnsClientOptions};
 use crate::http::client::{HttpClient, HttpClientOptions};
@@ -47,9 +47,12 @@ pub enum Command {
     },
 
     /// DNS client
-    #[command(after_help = format_examples(&[
-        "nk dns -H example.com  # DNS ping",
-    ]))]
+    #[command(
+        about = format!("{NEW_LINE}Sends both an A and AAAA DNS query."),
+        after_help = format_examples(&[
+            "nk dns -H example.com  # DNS ping",
+        ]),
+    )]
     Dns {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
@@ -72,9 +75,12 @@ pub enum Command {
     },
 
     /// HTTP client
-    #[command(after_help = format_examples(&[
-        "nk http -H example.com  # HTTP ping",
-    ]))]
+    #[command(
+        about = format!("{NEW_LINE}Send a HTTP GET request."),
+        after_help = format_examples(&[
+            "nk http -H example.com  # HTTP ping",
+        ])
+    )]
     Http {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
@@ -93,9 +99,12 @@ pub enum Command {
     },
 
     /// HTTPS client
-    #[command(after_help = format_examples(&[
-        "nk https -H example.com  # HTTPS ping",
-    ]))]
+    #[command(
+        about = format!("{NEW_LINE}Send a HTTP GET request."),
+        after_help = format_examples(&[
+            "nk https -H example.com  # HTTPS ping",
+        ])
+    )]
     Https {
         /// Remote host
         #[clap(short = 'H', long, display_order = 1)]
@@ -118,8 +127,10 @@ pub enum Command {
     },
 
     /// ICMP client
-    #[command(after_help = format_examples(&[
-        "nk icmp -H example.com  # ICMP ping",
+    #[command(
+        about = format!("{NEW_LINE}Send an ICMP Echo Request."),
+        after_help = format_examples(&[
+            "nk icmp -H example.com  # ICMP ping",
     ]))]
     Icmp {
         /// Remote host
@@ -131,10 +142,13 @@ pub enum Command {
     },
 
     /// TCP client/server
-    #[command(after_help = format_examples(&[
-        "nk tcp -H example.com -P 80  # Client TCP ping",
-        "nk tcp -l -p 8080            # Listen as a TCP server",
-        ]))]
+    #[command(
+        about = format!("{NEW_LINE}TCP client/server."),
+        after_help = format_examples(&[
+            "nk tcp -H example.com -P 80  # Client TCP ping",
+            "nk tcp -l -p 8080            # Listen as a TCP server",
+        ])
+    )]
     Tcp {
         /// Remote host
         #[clap(
@@ -161,10 +175,13 @@ pub enum Command {
     },
 
     /// UDP client/server
-    #[command(after_help = format_examples(&[
-        "nk udp -H example.com -P 80  # Client UDP ping",
-        "nk udp -l -p 8080            # Listen as UDP server",
-    ]))]
+    #[command(
+        about = format!("{NEW_LINE}UDP client/server."),
+        after_help = format_examples(&[
+            "nk udp -H example.com -P 80  # Client UDP ping",
+            "nk udp -l -p 8080            # Listen as UDP server",
+        ])
+    )]
     Udp {
         /// Remote host
         #[clap(
